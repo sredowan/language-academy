@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.npm
+.eslintcache
+
+# Build
+dist/
+build/
+.next/
+out/
+.cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.log
+backend_error.log
+student_debug.log
+student_debug_utf8.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large Files
+*.zip
+*.rar
+*.7z
+*.tar.gz
+*.iso
+backend.zip
+
+# Test
+coverage/
+
+# Sub-repo specific
+**/node_modules/
+**/dist/
+**/build/
+**/env
