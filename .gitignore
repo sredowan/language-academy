@@ -15,9 +15,16 @@ out/
 .env.local
 .env.*.local
 *.log
+*build_log*.txt
+*dev_log.txt
 backend_error.log
 student_debug.log
 student_debug_utf8.log
+backend/token.txt
+backend/error.txt
+backend/backend_log.txt
+admin-portal/dev_log.txt
+nul
 
 # IDE
 .vscode/
@@ -39,6 +46,9 @@ backend.zip
 
 # Test
 coverage/
+
+# Runtime uploads
+backend/uploads/
 
 # Sub-repo specific
 **/node_modules/

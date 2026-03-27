@@ -1,0 +1,30 @@
+const express = require('express');
+const router = express.Router();
+const expenseController = require('../controllers/expense.controller');
+const { authMiddleware } = require('../middleware/auth.middleware');
+const { branchMiddleware } = require('../middleware/branch.middleware');
+
+const upload = require('../utils/upload');
+
+router.use(authMiddleware);
+router.use(branchMiddleware);
+
+router.get('/', expenseController.getExpenses);
+router.get('/split', expenseController.getExpenseSplit);
+
+// Handle multipart/form-data for receipt uploads
+router.post('/', upload.single('receipt'), expenseController.createExpense);
+
+// Verification & Approval Layers
+router.put('/:id/verify', expenseController.verifyExpense);
+router.put('/:id/approve', expenseController.approveExpense);
+router.put('/:id/reject', expenseController.rejectExpense);
+
+// Expense Category routes
+router.get('/categories', expenseController.getExpenseCategories);
+router.get('/categories/flat', expenseController.getAllCategoriesFlat);
+router.post('/categories', expenseController.createExpenseCategory);
+router.put('/categories/:id', expenseController.updateExpenseCategory);
+router.delete('/categories/:id', expenseController.deleteExpenseCategory);
+
+module.exports = router;
