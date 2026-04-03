@@ -2,18 +2,22 @@ import React from 'react';
 import { stageColors, stageLabels, stageIcons } from './CRMComponents';
 
 const AnalyticsTab = ({ analytics }) => {
-  const { funnel, source, forecast } = analytics;
+  const { funnel, source, forecast, successResults, destinationCountries } = analytics;
   const maxCount = funnel?.funnel ? Math.max(...funnel.funnel.map(f => f.count), 1) : 1;
+  const totalSuccessResults = successResults?.reduce((sum, item) => sum + Number(item.dataValues?.count || item.count || 0), 0) || 0;
+  const totalDestinationCountries = destinationCountries?.reduce((sum, item) => sum + Number(item.dataValues?.count || item.count || 0), 0) || 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.8rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.8rem' }}>
         {[
           { label: 'CONVERSION RATE', value: `${funnel?.overallConversion || 0}%`, sub: 'Lead → Successful', color: '#10b981', icon: '📈' },
           { label: 'REAL REVENUE', value: `৳${(funnel?.successfulRevenue || 0).toLocaleString()}`, sub: 'Fees collected only', color: '#06b6d4', icon: '💰' },
+          { label: 'PAYMENT REJECTED', value: `${funnel?.paymentRejectedCount || 0}`, sub: `৳${(funnel?.rejectedRevenue || 0).toLocaleString()} lost at POS`, color: '#ef4444', icon: '🚫' },
           { label: 'FORECAST', value: `৳${(forecast?.weightedForecast || 0).toLocaleString()}`, sub: 'Pipeline × Probability', color: '#3b82f6', icon: '🔮' },
           { label: 'PIPELINE', value: `৳${(forecast?.totalPipelineValue || 0).toLocaleString()}`, sub: 'Open opportunities', color: '#f59e0b', icon: '📊' },
+          { label: 'SUCCESS RECORDS', value: `${totalSuccessResults}`, sub: `${totalDestinationCountries} destination updates`, color: '#8b5cf6', icon: '🎓' },
         ].map(k => (
           <div key={k.label} style={{ padding: '1.2rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', borderBottom: `3px solid ${k.color}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -53,6 +57,7 @@ const AnalyticsTab = ({ analytics }) => {
             const total = parseInt(s.dataValues?.total || s.total || 0);
             const converted = parseInt(s.dataValues?.converted || s.converted || 0);
             const revenue = parseFloat(s.dataValues?.revenue || s.revenue || 0);
+            const rejected = parseInt(s.dataValues?.payment_rejected || s.payment_rejected || 0);
             const convRate = total > 0 ? ((converted / total) * 100).toFixed(0) : 0;
             const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899'];
             return (
@@ -61,13 +66,14 @@ const AnalyticsTab = ({ analytics }) => {
                   <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: colors[i % colors.length] }} />
                   <div>
                     <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>{s.source || 'Unknown'}</span>
-                    {revenue > 0 && <p style={{ fontSize: '0.65rem', color: '#10b981' }}>৳{revenue.toLocaleString()} revenue</p>}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem', alignItems: 'center' }}>
-                  <span style={{ color: 'var(--text-dim)' }}>{total} leads</span>
-                  <span style={{ color: convRate > 20 ? '#10b981' : '#f59e0b', fontWeight: '700', fontSize: '0.75rem', padding: '2px 6px', background: convRate > 20 ? '#10b98110' : '#f59e0b10', borderRadius: '6px' }}>{convRate}%</span>
-                </div>
+                     {(revenue > 0 || rejected > 0) && <p style={{ fontSize: '0.65rem', color: revenue > 0 ? '#10b981' : '#ef4444' }}>{[revenue > 0 ? `৳${revenue.toLocaleString()} revenue` : null, rejected > 0 ? `${rejected} rejected at payment` : null].filter(Boolean).join(' · ')}</p>}
+                   </div>
+                 </div>
+                 <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem', alignItems: 'center' }}>
+                   <span style={{ color: 'var(--text-dim)' }}>{total} leads</span>
+                   {rejected > 0 && <span style={{ color: '#ef4444', fontWeight: '700' }}>{rejected} rejected</span>}
+                   <span style={{ color: convRate > 20 ? '#10b981' : '#f59e0b', fontWeight: '700', fontSize: '0.75rem', padding: '2px 6px', background: convRate > 20 ? '#10b98110' : '#f59e0b10', borderRadius: '6px' }}>{convRate}%</span>
+                 </div>
               </div>
             );
           }) : <p style={{ color: 'var(--text-dim)', fontSize: '0.82rem' }}>No source data yet</p>}
@@ -89,6 +95,48 @@ const AnalyticsTab = ({ analytics }) => {
           </div>
         </div>
       )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.2rem' }}>
+        <div className="glass-morphism" style={{ padding: '1.5rem' }}>
+          <h3 style={{ marginBottom: '1rem', fontSize: '1rem', fontWeight: '700' }}>Successful Students by Final Result</h3>
+          {successResults && successResults.length > 0 ? successResults.map((item, index) => {
+            const label = item.final_course_result || item.dataValues?.final_course_result || 'Unknown';
+            const count = Number(item.count || item.dataValues?.count || 0);
+            const width = totalSuccessResults > 0 ? Math.max((count / totalSuccessResults) * 100, 8) : 8;
+            return (
+              <div key={`${label}-${index}`} style={{ marginBottom: '0.9rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+                  <span style={{ fontWeight: '600' }}>{label}</span>
+                  <span style={{ color: 'var(--text-dim)' }}>{count}</span>
+                </div>
+                <div style={{ height: '10px', background: 'var(--glass)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ width: `${width}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)', borderRadius: '6px' }} />
+                </div>
+              </div>
+            );
+          }) : <p style={{ color: 'var(--text-dim)', fontSize: '0.82rem' }}>No success result records yet</p>}
+        </div>
+
+        <div className="glass-morphism" style={{ padding: '1.5rem' }}>
+          <h3 style={{ marginBottom: '1rem', fontSize: '1rem', fontWeight: '700' }}>Successful Destination Countries</h3>
+          {destinationCountries && destinationCountries.length > 0 ? destinationCountries.map((item, index) => {
+            const label = item.success_destination_country || item.dataValues?.success_destination_country || 'Unknown';
+            const count = Number(item.count || item.dataValues?.count || 0);
+            const width = totalDestinationCountries > 0 ? Math.max((count / totalDestinationCountries) * 100, 8) : 8;
+            return (
+              <div key={`${label}-${index}`} style={{ marginBottom: '0.9rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+                  <span style={{ fontWeight: '600' }}>{label}</span>
+                  <span style={{ color: 'var(--text-dim)' }}>{count}</span>
+                </div>
+                <div style={{ height: '10px', background: 'var(--glass)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ width: `${width}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #34d399)', borderRadius: '6px' }} />
+                </div>
+              </div>
+            );
+          }) : <p style={{ color: 'var(--text-dim)', fontSize: '0.82rem' }}>No destination-country records yet</p>}
+        </div>
+      </div>
     </div>
   );
 };

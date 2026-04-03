@@ -7,11 +7,77 @@ const JournalLine = require('../models/JournalLine');
 const sequelize = require('../config/db.config');
 const { fn, col, literal, Op } = require('sequelize');
 
+const AUTO_APPROVAL_THRESHOLD = 5000; // BDT
+
+// ── Helper: Create journal entries for an approved expense ──
+const createExpenseJournalEntries = async (expense, userId, transaction) => {
+  const targetBranch = expense.branch_id;
+  const liquidAccount = await Account.findByPk(expense.account_id);
+  if (!liquidAccount) throw new Error('Payment source (Bank/Cash) account not found');
+
+  let expenseAccount = await Account.findOne({ where: { name: expense.category, type: 'expense', branch_id: targetBranch } });
+  if (!expenseAccount) {
+    const existing = await Account.findAll({ where: { type: 'expense', branch_id: targetBranch }, attributes: ['code'] });
+    let maxCode = 5000;
+    existing.forEach(acc => {
+      const ci = parseInt(acc.code.split('-')[0]);
+      if (!isNaN(ci) && ci > maxCode) maxCode = ci;
+    });
+    expenseAccount = await Account.create({
+      branch_id: targetBranch, code: targetBranch === 1 ? `${maxCode + 1}` : `${maxCode + 1}-U`,
+      name: expense.category, type: 'expense', is_active: true
+    }, { transaction });
+  }
+
+  const entry = await JournalEntry.create({
+    branch_id: targetBranch,
+    ref_no: `EXP-APP-${expense.id}-${Date.now()}`,
+    description: expense.description || `Approved Expense: ${expense.category}`,
+    date: new Date(),
+    posted_by: userId
+  }, { transaction });
+
+  await JournalLine.bulkCreate([
+    { journal_entry_id: entry.id, account_id: expenseAccount.id, debit: expense.amount, credit: 0, notes: expense.description },
+    { journal_entry_id: entry.id, account_id: liquidAccount.id, debit: 0, credit: expense.amount, notes: `Paid via ${expense.payment_method}` }
+  ], { transaction });
+
+  return entry;
+};
+
+// ── Helper: Create reversal journal entries for a deleted expense ──
+const createReversalJournalEntries = async (expense, userId, transaction) => {
+  const targetBranch = expense.branch_id;
+  const liquidAccount = await Account.findByPk(expense.account_id);
+  if (!liquidAccount) throw new Error('Payment source account not found for reversal');
+
+  const expenseAccount = await Account.findOne({ where: { name: expense.category, type: 'expense', branch_id: targetBranch } });
+  if (!expenseAccount) throw new Error('Expense account not found for reversal');
+
+  const entry = await JournalEntry.create({
+    branch_id: targetBranch,
+    ref_no: `EXP-REV-${expense.id}-${Date.now()}`,
+    description: `Reversal: ${expense.description || expense.category} (Deleted)`,
+    date: new Date(),
+    posted_by: userId
+  }, { transaction });
+
+  // Reverse: Credit the expense account, Debit the liquid account
+  await JournalLine.bulkCreate([
+    { journal_entry_id: entry.id, account_id: expenseAccount.id, debit: 0, credit: expense.amount, notes: `Reversal - ${expense.description}` },
+    { journal_entry_id: entry.id, account_id: liquidAccount.id, debit: expense.amount, credit: 0, notes: `Reversal - refund via ${expense.payment_method}` }
+  ], { transaction });
+
+  return entry;
+};
+
+// ── GET /expenses ──
 exports.getExpenses = async (req, res) => {
   try {
-    const { category, from, to } = req.query;
+    const { category, from, to, status } = req.query;
     const where = {};
     if (category) where.category = category;
+    if (status && status !== 'all') where.status = status;
     if (from || to) {
       where.date = {};
       if (from) where.date[Op.gte] = from;
@@ -22,7 +88,8 @@ exports.getExpenses = async (req, res) => {
       where,
       include: [
         { model: Account, attributes: ['name', 'code', 'type'] },
-        { model: User, as: 'Approver', attributes: ['name'] }
+        { model: User, as: 'Approver', attributes: ['name'] },
+        { model: User, as: 'Deleter', attributes: ['name'] }
       ],
       order: [['date', 'DESC']]
     });
@@ -32,6 +99,7 @@ exports.getExpenses = async (req, res) => {
   }
 };
 
+// ── GET /expenses/split ──
 exports.getExpenseSplit = async (req, res) => {
   try {
     const split = await Expense.findAll({
@@ -52,27 +120,59 @@ exports.getExpenseSplit = async (req, res) => {
   }
 };
 
+// ── POST /expenses — Smart Auto-Approval ──
 exports.createExpense = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const { account_id, amount, description, category, payment_method, date } = req.body;
     const targetBranch = req.branchId || 1;
+    const numericAmount = parseFloat(amount);
+
     // receipt_url comes from multer if file was uploaded
     const receipt_url = req.file ? `/uploads/expenses/${req.file.filename}` : null;
 
+    // If amount >= 5000, receipt is REQUIRED
+    if (numericAmount >= AUTO_APPROVAL_THRESHOLD && !receipt_url) {
+      await t.rollback();
+      return res.status(400).json({ 
+        error: `Expenses of BDT ${AUTO_APPROVAL_THRESHOLD.toLocaleString()} or above require a receipt upload for branch admin approval.` 
+      });
+    }
+
+    // Determine initial status based on threshold
+    const isAutoApproved = numericAmount < AUTO_APPROVAL_THRESHOLD;
+    const initialStatus = isAutoApproved ? 'approved' : 'pending';
+
     const expense = await Expense.create({
       branch_id: targetBranch,
-      account_id, amount, description, category, payment_method,
-      receipt_url, 
-      date: date || new Date(), 
-      status: 'pending' // Multi-layer starts as pending
-    });
+      account_id, amount: numericAmount, description, category, payment_method,
+      receipt_url,
+      date: date || new Date(),
+      status: initialStatus,
+      approved_by: isAutoApproved ? req.user.id : null
+    }, { transaction: t });
 
-    res.status(201).json(expense);
+    // If auto-approved, create journal entries immediately
+    if (isAutoApproved) {
+      await createExpenseJournalEntries(expense, req.user.id, t);
+    }
+
+    await t.commit();
+    res.status(201).json({ 
+      expense, 
+      auto_approved: isAutoApproved,
+      message: isAutoApproved 
+        ? 'Expense auto-approved and journal entry created (below BDT 5,000)' 
+        : 'Expense submitted for branch admin approval (BDT 5,000+). Receipt attached.'
+    });
   } catch (error) {
+    await t.rollback();
+    console.error('Create Expense Error:', error);
     res.status(500).json({ error: error.message });
   }
 };
 
+// ── PUT /expenses/:id/verify ──
 exports.verifyExpense = async (req, res) => {
   try {
     const expense = await Expense.findByPk(req.params.id);
@@ -90,6 +190,7 @@ exports.verifyExpense = async (req, res) => {
   }
 };
 
+// ── PUT /expenses/:id/approve ──
 exports.approveExpense = async (req, res) => {
   const t = await sequelize.transaction();
   try {
@@ -97,37 +198,7 @@ exports.approveExpense = async (req, res) => {
     if (!expense) return res.status(404).json({ error: 'Expense not found' });
     if (expense.status === 'approved') return res.status(400).json({ error: 'Already approved' });
 
-    // --- Double-Entry Logic Triggers ONLY on Approval ---
-    const targetBranch = expense.branch_id;
-    const liquidAccount = await Account.findByPk(expense.account_id);
-    if (!liquidAccount) throw new Error('Payment source (Bank/Cash) account not found');
-
-    let expenseAccount = await Account.findOne({ where: { name: expense.category, type: 'expense', branch_id: targetBranch } });
-    if (!expenseAccount) {
-      const existing = await Account.findAll({ where: { type: 'expense', branch_id: targetBranch }, attributes: ['code'] });
-      let maxCode = 5000;
-      existing.forEach(acc => {
-        const ci = parseInt(acc.code.split('-')[0]);
-        if (!isNaN(ci) && ci > maxCode) maxCode = ci;
-      });
-      expenseAccount = await Account.create({
-        branch_id: targetBranch, code: targetBranch === 1 ? `${maxCode + 1}` : `${maxCode + 1}-U`,
-        name: expense.category, type: 'expense', is_active: true
-      }, { transaction: t });
-    }
-
-    const entry = await JournalEntry.create({
-      branch_id: targetBranch,
-      ref_no: `EXP-APP-${expense.id}-${Date.now()}`,
-      description: expense.description || `Approved Expense: ${expense.category}`,
-      date: new Date(),
-      posted_by: req.user.id
-    }, { transaction: t });
-
-    await JournalLine.bulkCreate([
-      { journal_entry_id: entry.id, account_id: expenseAccount.id, debit: expense.amount, credit: 0, notes: expense.description },
-      { journal_entry_id: entry.id, account_id: liquidAccount.id, debit: 0, credit: expense.amount, notes: `Paid via ${expense.payment_method}` }
-    ], { transaction: t });
+    await createExpenseJournalEntries(expense, req.user.id, t);
 
     await expense.update({
       status: 'approved',
@@ -143,6 +214,7 @@ exports.approveExpense = async (req, res) => {
   }
 };
 
+// ── PUT /expenses/:id/reject ──
 exports.rejectExpense = async (req, res) => {
   try {
     const { rejection_reason } = req.body;
@@ -160,6 +232,52 @@ exports.rejectExpense = async (req, res) => {
   }
 };
 
+// ── DELETE /expenses/:id — Soft-delete with Journal Reversal ──
+exports.deleteExpense = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { deletion_reason } = req.body;
+    if (!deletion_reason || !deletion_reason.trim()) {
+      await t.rollback();
+      return res.status(400).json({ error: 'A deletion reason is required.' });
+    }
+
+    const expense = await Expense.findByPk(req.params.id);
+    if (!expense) {
+      await t.rollback();
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+    if (expense.status === 'deleted') {
+      await t.rollback();
+      return res.status(400).json({ error: 'Expense already deleted' });
+    }
+
+    // If the expense was approved, reverse the journal entries
+    if (expense.status === 'approved') {
+      await createReversalJournalEntries(expense, req.user.id, t);
+    }
+
+    await expense.update({
+      status: 'deleted',
+      deletion_reason: deletion_reason.trim(),
+      deleted_by: req.user.id,
+      deleted_at: new Date()
+    }, { transaction: t });
+
+    await t.commit();
+    res.json({ 
+      message: expense.status === 'approved' 
+        ? 'Expense deleted and journal entries reversed' 
+        : 'Expense deleted',
+      expense 
+    });
+  } catch (error) {
+    console.error('Delete Expense Error:', error);
+    if (t) await t.rollback();
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // --- Expense Category CRUD ---
 
 exports.getExpenseCategories = async (req, res) => {
@@ -169,7 +287,6 @@ exports.getExpenseCategories = async (req, res) => {
       include: [{ model: ExpenseCategory, as: 'Children', where: { is_active: true }, required: false }],
       order: [['name', 'ASC'], [{ model: ExpenseCategory, as: 'Children' }, 'name', 'ASC']]
     });
-    console.log('[DEBUG] Fetched Categories Count:', categories.length);
     res.json(categories);
   } catch (error) {
     console.error('[ERROR] Fetch Categories Error:', error);
@@ -193,12 +310,8 @@ exports.getAllCategoriesFlat = async (req, res) => {
 exports.createExpenseCategory = async (req, res) => {
   try {
     const { name, parent_id, description } = req.body;
-    console.log('[DEBUG] Category Creation Request:', { name, parent_id, branchId: req.branchId });
-    
     const cleanParentId = (parent_id && parent_id !== '' && parent_id !== 'null' && parent_id !== 'undefined') ? parseInt(parent_id) : null;
     const type = cleanParentId ? 'sub' : 'head';
-    
-    console.log('[DEBUG] Parsed cleanParentId:', cleanParentId, 'Type:', type);
 
     if (cleanParentId && !isNaN(cleanParentId)) {
       const parent = await ExpenseCategory.findByPk(cleanParentId);
@@ -214,7 +327,6 @@ exports.createExpenseCategory = async (req, res) => {
       type, 
       description
     });
-    console.log('[DEBUG] Category Created Successfully:', category.id);
     res.status(201).json(category);
   } catch (error) {
     console.error('[ERROR] Expense Category Error:', error);

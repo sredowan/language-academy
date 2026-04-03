@@ -33,17 +33,17 @@ const SubscriptionView = () => {
 
   if (success) {
     return (
-      <div className="max-w-2xl mx-auto mt-12 text-center p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-emerald-500/20 animate-in zoom-in duration-300">
+      <div className="max-w-2xl mx-auto mt-12 text-center p-8 glass-morphism rounded-2xl shadow-2xl border border-emerald-500/20 animate-in zoom-in duration-300">
         <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center mx-auto mb-6">
           <Check className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
         </div>
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Subscription Activated!</h2>
+        <h2 className="text-3xl font-bold text-[var(--text-main)] mb-4">Subscription Activated!</h2>
         <p className="text-gray-600 dark:text-gray-400 mb-8">
           Welcome to PTE Premium. You now have full access to AI scoring, mock tests, and our prediction question bank for the next 90 days.
         </p>
         <button 
           onClick={() => window.location.href = '/dashboard'}
-          className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-95"
+          className="px-8 py-3 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-bold rounded-xl shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-95"
         >
           Go to Dashboard
         </button>
@@ -54,7 +54,7 @@ const SubscriptionView = () => {
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white mb-4">Choose Your Growth Plan</h1>
+        <h1 className="text-4xl font-extrabold text-[var(--text-main)] mb-4">Choose Your Growth Plan</h1>
         <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
           Invest in your future. Get the tools used by successful PTE candidates to smash their score goals.
         </p>
@@ -62,7 +62,7 @@ const SubscriptionView = () => {
 
       <div className="grid md:grid-cols-2 gap-8 items-start">
         {/* Free Plan */}
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-sm opacity-80">
+        <div className="glass-morphism p-8 rounded-3xl border border-gray-200 border-[var(--border)] shadow-sm opacity-80">
           <h3 className="text-xl font-bold mb-2">Basic Practice</h3>
           <div className="flex items-baseline gap-1 mb-6">
             <span className="text-4xl font-black">Free</span>
@@ -88,8 +88,8 @@ const SubscriptionView = () => {
         </div>
 
         {/* Premium Plan */}
-        <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl border-2 border-indigo-600 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 bg-indigo-600 text-white px-6 py-1 text-[10px] font-black uppercase tracking-widest rounded-bl-xl shadow-md">
+        <div className="glass-morphism p-8 rounded-3xl border-2 border-indigo-600 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white px-6 py-1 text-[10px] font-black uppercase tracking-widest rounded-bl-xl shadow-md">
             RECOMMENDED
           </div>
           
@@ -113,7 +113,7 @@ const SubscriptionView = () => {
               "Dual Device Simultaneous Sync",
               "Personalized Performance Review"
             ].map((item, i) => (
-              <li key={i} className="flex items-center gap-3 text-sm text-gray-900 dark:text-white font-medium">
+              <li key={i} className="flex items-center gap-3 text-sm text-[var(--text-main)] font-medium">
                 <Check className="w-4 h-4 text-emerald-500" /> {item}
               </li>
             ))}
@@ -138,9 +138,9 @@ const SubscriptionView = () => {
                     key={method}
                     disabled={loading}
                     onClick={() => handleUpgrade(method.toLowerCase())}
-                    className="flex flex-col items-center justify-center p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all font-bold text-sm disabled:opacity-50"
+                    className="flex flex-col items-center justify-center p-4 border border-gray-200 border-[var(--border)] rounded-xl hover:border-indigo-600 hover:bg-[var(--glass)] dark:hover:bg-indigo-900/20 transition-all font-bold text-sm disabled:opacity-50"
                   >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin mb-2" /> : <CreditCard className="w-5 h-5 mb-2 text-indigo-600" />}
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin mb-2" /> : <CreditCard className="w-5 h-5 mb-2 text-[var(--primary)]" />}
                     {method}
                   </button>
                 ))}
@@ -156,7 +156,7 @@ const SubscriptionView = () => {
       <div className="mt-20 grid md:grid-cols-3 gap-8">
         <div className="flex flex-col items-center text-center">
           <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center mb-4">
-            <Zap className="w-6 h-6 text-blue-600" />
+            <Zap className="w-6 h-6 text-[var(--accent)]" />
           </div>
           <h4 className="font-bold mb-2">Instant Activation</h4>
           <p className="text-xs text-gray-600 dark:text-gray-400">Your premium features unlock the moment your payment is confirmed.</p>

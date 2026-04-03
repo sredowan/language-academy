@@ -18,6 +18,9 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit, courses, batches, isAdding
     current_address: '',
     permanent_address: '',
     nid_birth_cert: '',
+    post_course_goal_type: '',
+    target_country: '',
+    english_level: '',
     educational_details: [
       { exam_name: 'SSC', institution_name: '', passing_year: '', result: '' },
       { exam_name: 'HSC', institution_name: '', passing_year: '', result: '' }
@@ -42,6 +45,9 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit, courses, batches, isAdding
         current_address: '',
         permanent_address: '',
         nid_birth_cert: '',
+        post_course_goal_type: '',
+        target_country: '',
+        english_level: '',
         educational_details: [
           { exam_name: 'SSC', institution_name: '', passing_year: '', result: '' },
           { exam_name: 'HSC', institution_name: '', passing_year: '', result: '' }
@@ -53,7 +59,11 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit, courses, batches, isAdding
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'post_course_goal_type' && value !== 'specific_country' ? { target_country: '' } : {})
+    }));
   };
 
   const handleEducationChange = (index, field, value) => {
@@ -151,6 +161,33 @@ const AddStudentModal = ({ isOpen, onClose, onSubmit, courses, batches, isAdding
               <input className="glass-input" name="mother_name" value={formData.mother_name} onChange={handleInputChange} style={{ width: '100%', padding: '0.6rem' }} />
             </div>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.85rem' }}>After course, where would they like to go?</label>
+              <select className="glass-input" name="post_course_goal_type" value={formData.post_course_goal_type} onChange={handleInputChange} style={{ width: '100%', padding: '0.6rem', appearance: 'auto' }}>
+                <option value="">Select Option</option>
+                <option value="specific_country">Specific Country</option>
+                <option value="another_purpose">Another Purpose</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.85rem' }}>English Level</label>
+              <select className="glass-input" name="english_level" value={formData.english_level} onChange={handleInputChange} style={{ width: '100%', padding: '0.6rem', appearance: 'auto' }}>
+                <option value="">Select Level</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="expert">Expert</option>
+              </select>
+            </div>
+          </div>
+
+          {formData.post_course_goal_type === 'specific_country' && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.85rem' }}>Country Name</label>
+              <input className="glass-input" name="target_country" value={formData.target_country} onChange={handleInputChange} placeholder="e.g. Australia, Canada, UK" style={{ width: '100%', padding: '0.6rem' }} />
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>

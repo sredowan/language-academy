@@ -7,7 +7,8 @@ exports.register = async (req, res) => {
   try {
     const { name, email, password, branch_id, role } = req.body;
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const rawPassword = password || require('crypto').randomBytes(16).toString('hex');
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
     const user = await User.create({
       name,
       email,
@@ -58,12 +59,48 @@ exports.getStaff = async (req, res) => {
   try {
     const staff = await User.findAll({
       where: {
-        role: ['super_admin', 'branch_admin', 'staff', 'teacher'],
+        role: {
+          [require('sequelize').Op.notIn]: ['student', 'guardian']
+        },
         branch_id: req.branchId
       },
-      attributes: ['id', 'name', 'role']
+      attributes: ['id', 'name', 'email', 'role']
     });
     res.json(staff);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateRole = async (req, res) => {
+  try {
+    const { userId, role } = req.body;
+
+    const user = await User.findOne({ where: { id: userId, branch_id: req.branchId } });
+    if (!user) return res.status(404).json({ error: 'User not found or you do not have permission.' });
+
+    user.role = role;
+    await user.save();
+
+    res.json({ message: 'User role updated successfully.', user: { id: user.id, name: user.name, role: user.role } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.setStaffPassword = async (req, res) => {
+  try {
+    const { userId, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+       return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    const user = await User.findOne({ where: { id: userId, branch_id: req.branchId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    
+    user.password = await require('bcryptjs').hash(newPassword, 10);
+    await user.save();
+    
+    res.json({ message: 'Password updated successfully.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

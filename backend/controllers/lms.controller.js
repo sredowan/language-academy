@@ -385,3 +385,15 @@ exports.updateCourse = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.uploadCourseImageHandler = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+    const imageUrl = `/uploads/courses/${req.file.filename}`;
+    res.json({ url: imageUrl });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

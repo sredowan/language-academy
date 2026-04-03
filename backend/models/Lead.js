@@ -27,17 +27,31 @@ const Lead = sequelize.define('Lead', {
   email: {
     type: DataTypes.STRING,
   },
+  destination_country: {
+    type: DataTypes.STRING,
+  },
   source: {
     type: DataTypes.STRING,
   },
   status: {
-    type: DataTypes.ENUM('new', 'contacted', 'interested', 'trial', 'enrolled', 'fees_pending', 'successful', 'lost'),
+    type: DataTypes.ENUM('new', 'contacted', 'interested', 'trial', 'enrolled', 'fees_pending', 'payment_rejected', 'successful', 'lost'),
     defaultValue: 'new',
   },
   course_id: {
     type: DataTypes.INTEGER,
     allowNull: true,
     comment: 'Selected course — auto-fills deal_value from course.base_fee',
+  },
+  batch_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Selected batch from website enquiry or checkout',
+  },
+  payment_ref: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true,
+    comment: 'Session reference for website checkout payment',
   },
   counselor_id: {
     type: DataTypes.INTEGER,

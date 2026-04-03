@@ -14,6 +14,10 @@ router.get('/batches/:id/students', lmsController.getBatchStudents);
 router.get('/courses', lmsController.getCourses);
 router.post('/courses', lmsController.createCourse);
 router.put('/courses/:id', lmsController.updateCourse);
+
+const uploadCourseImage = require('../utils/uploadCourseImage');
+router.post('/courses/upload-image', uploadCourseImage.single('image'), lmsController.uploadCourseImageHandler);
+
 router.patch('/batches/:id/status', lmsController.updateBatchStatus);
 
 module.exports = router;

@@ -68,6 +68,7 @@ const Batch = sequelize.define('Batch', {
 
 Batch.belongsTo(Branch, { foreignKey: 'branch_id' });
 Batch.belongsTo(Course, { foreignKey: 'course_id' });
+Course.hasMany(Batch, { foreignKey: 'course_id' });
 Batch.belongsTo(User, { as: 'Trainer', foreignKey: 'trainer_id' });
 
 module.exports = Batch;

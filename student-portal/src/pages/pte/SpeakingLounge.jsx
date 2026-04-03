@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Mic, Play, Square, RefreshCcw, 
   Clock, CheckCircle2, AlertCircle, Loader2,
-  ArrowLeft, Waveform
+  ArrowLeft, Zap
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
@@ -94,7 +94,7 @@ const SpeakingLounge = () => {
     }
   };
 
-  if (loading || !task) return <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-600" /></div>;
+  if (loading || !task) return <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-[var(--primary)]" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
@@ -108,10 +108,10 @@ const SpeakingLounge = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm space-y-6">
-        <div className="flex items-center justify-between py-3 border-b border-gray-50 dark:border-gray-700">
+      <div className="glass-morphism rounded-3xl p-8 border border-[var(--border)] border-[var(--border)] shadow-sm space-y-6">
+        <div className="flex items-center justify-between py-3 border-b border-gray-50 border-[var(--border)]">
            <div className="flex items-center gap-2">
-             <Clock className="w-4 h-4 text-indigo-600" />
+             <Clock className="w-4 h-4 text-[var(--primary)]" />
              <span className="text-sm font-bold">
                {status === 'prep' ? `Preparing: ${prepTimer}s` : status === 'recording' ? `Recording: ${timer}s` : 'Recording Completed'}
              </span>
@@ -125,20 +125,20 @@ const SpeakingLounge = () => {
            </div>
         </div>
 
-        <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-2xl border border-gray-100 dark:border-gray-800 text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-200 shadow-inner">
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-8 rounded-2xl border border-[var(--border)] dark:border-gray-800 text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-200 shadow-inner">
           {task.content?.prompt || task.prompt || 'Please wait for the prompt to load...'}
         </div>
 
         <div className="flex flex-col items-center justify-center py-10 space-y-6">
           <div className={`w-24 h-24 rounded-full flex items-center justify-center transition-all ${
-            status === 'recording' ? 'bg-red-600 shadow-2xl shadow-red-500/40 ring-4 ring-red-100' : 'bg-indigo-600 shadow-xl'
+            status === 'recording' ? 'bg-red-600 shadow-2xl shadow-red-500/40 ring-4 ring-red-100' : 'bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white shadow-xl'
           }`}>
              {status === 'recording' ? <Square className="w-8 h-8 text-white fill-white" /> : <Mic className="w-10 h-10 text-white" />}
           </div>
           
           <div className="flex items-center gap-4">
              {status === 'prep' && (
-               <button onClick={startRecording} className="px-8 py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-all shadow-lg">Start Now</button>
+               <button onClick={startRecording} className="px-8 py-3 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-black rounded-xl hover:bg-indigo-700 transition-all shadow-lg">Start Now</button>
              )}
              {status === 'recording' && (
                <button onClick={stopRecording} className="px-8 py-3 bg-red-600 text-white font-black rounded-xl hover:bg-red-700 transition-all shadow-lg">Stop Recording</button>
@@ -148,7 +148,7 @@ const SpeakingLounge = () => {
                  <button onClick={() => { setStatus('prep'); setPrepTimer(35); setTimer(40); }} className="flex items-center gap-2 px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold rounded-xl hover:bg-gray-200 transition-all">
                    <RefreshCcw className="w-4 h-4" /> Redo
                  </button>
-                 <button onClick={handleSubmit} className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-700 transition-all shadow-lg">
+                 <button onClick={handleSubmit} className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-black rounded-xl hover:bg-indigo-700 transition-all shadow-lg">
                    Submit Attempt
                  </button>
                </div>
@@ -159,8 +159,8 @@ const SpeakingLounge = () => {
 
       {status === 'submitting' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl max-w-sm w-full text-center">
-             <Loader2 className="w-12 h-12 animate-spin mx-auto text-indigo-600 mb-4" />
+          <div className="glass-morphism p-8 rounded-3xl max-w-sm w-full text-center">
+             <Loader2 className="w-12 h-12 animate-spin mx-auto text-[var(--primary)] mb-4" />
              <h3 className="text-xl font-black mb-2">Analyzing Audio...</h3>
              <p className="text-sm text-gray-500">AI is evaluating your pronunciation, fluency, and content matching.</p>
           </div>
@@ -168,21 +168,21 @@ const SpeakingLounge = () => {
       )}
 
       {result && (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border-2 border-emerald-500/20 shadow-xl space-y-6 animate-in slide-in-from-top-6 duration-500">
+        <div className="glass-morphism rounded-3xl p-8 border-2 border-emerald-500/20 shadow-xl space-y-6 animate-in slide-in-from-top-6 duration-500">
            <div className="flex items-center justify-between">
               <h3 className="text-xl font-black flex items-center gap-2">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500" /> Result Analysis
               </h3>
-              <div className="text-3xl font-black text-indigo-600">{result.score || 0}<span className="text-sm text-gray-400">/90</span></div>
+              <div className="text-3xl font-black text-[var(--primary)]">{result.score || 0}<span className="text-sm text-gray-400">/90</span></div>
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
-                { label: 'Pronunciation', value: isPremium ? '78/90' : 'Upgrade', premium: true, color: 'text-blue-600' },
-                { label: 'Oral Fluency', value: isPremium ? '82/90' : 'Upgrade', premium: true, color: 'text-indigo-600' },
+                { label: 'Pronunciation', value: isPremium ? '78/90' : 'Upgrade', premium: true, color: 'text-[var(--accent)]' },
+                { label: 'Oral Fluency', value: isPremium ? '82/90' : 'Upgrade', premium: true, color: 'text-[var(--primary)]' },
                 { label: 'Content', value: '75/90', premium: false, color: 'text-emerald-600' },
               ].map((m, i) => (
-                <div key={i} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <div key={i} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-[var(--border)] dark:border-gray-800">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{m.label}</p>
                   <p className={`text-lg font-black ${m.color}`}>{m.value}</p>
                   {!isPremium && m.premium && <div className="flex items-center gap-1 text-[9px] text-gray-500 mt-1"><Zap className="w-2 h-2 fill-yellow-500 text-yellow-500" /> Premium Feature</div>}
@@ -190,8 +190,8 @@ const SpeakingLounge = () => {
               ))}
            </div>
 
-           <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/40">
-              <h4 className="text-sm font-bold text-indigo-900 dark:text-indigo-200 mb-2 flex items-center gap-2">
+           <div className="p-4 bg-[var(--glass)] dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/40">
+              <h4 className="text-sm font-bold text-[var(--text-main)] dark:text-indigo-200 mb-2 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" /> Improvement Tips
               </h4>
               <p className="text-xs text-indigo-800 dark:text-indigo-300 leading-relaxed">
@@ -201,7 +201,7 @@ const SpeakingLounge = () => {
               </p>
            </div>
            
-           <button onClick={() => navigate('/pte')} className="w-full py-3 border border-gray-200 dark:border-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition-all">
+           <button onClick={() => navigate('/pte')} className="w-full py-3 border border-gray-200 border-[var(--border)] rounded-xl font-bold text-sm hover:bg-gray-50 transition-all">
              Try Another Task
            </button>
         </div>

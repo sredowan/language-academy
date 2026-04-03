@@ -28,8 +28,8 @@ const PracticeHub = () => {
       title: 'Writing', 
       desc: 'Summarize Text & Essay Writing', 
       icon: Type, 
-      color: 'text-indigo-600', 
-      bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+      color: 'text-[var(--primary)]', 
+      bg: 'bg-[#7bc62e]/10',
       isPremium: false 
     },
     { 
@@ -46,8 +46,8 @@ const PracticeHub = () => {
       title: 'Listening', 
       desc: 'SST, Multiple Choice & WFD', 
       icon: Headphones, 
-      color: 'text-blue-600', 
-      bg: 'bg-blue-50 dark:bg-blue-900/20',
+      color: 'text-[var(--accent)]', 
+      bg: 'bg-[#275fa7]/10',
       isPremium: false 
     },
   ];
@@ -64,12 +64,12 @@ const PracticeHub = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black">Practice Lounge</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Master every PTE section with AI-powered feedback.</p>
+          <p className="text-[var(--text-dim)] mt-1">Master every PTE section with AI-powered feedback.</p>
         </div>
         {!isPremium && (
           <button 
             onClick={() => navigate('/subscription')}
-            className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-indigo-500/20 hover:scale-105 transition-transform"
+            className="flex items-center gap-2 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl hover:scale-105 transition-transform"
           >
             <Zap className="w-4 h-4 fill-white" /> Upgrade to Premium
           </button>
@@ -84,11 +84,11 @@ const PracticeHub = () => {
             onClick={() => navigate(`/pte/${sec.id}`)}
             className={`${sec.bg} p-6 rounded-3xl border border-transparent hover:border-current/10 transition-all group text-left relative overflow-hidden`}
           >
-            <div className={`${sec.color} mb-4 p-3 bg-white dark:bg-gray-800 rounded-2xl shadow-sm inline-block group-hover:scale-110 transition-transform`}>
+            <div className={`${sec.color} mb-4 p-3 glass-morphism rounded-2xl inline-block group-hover:scale-110 transition-transform`}>
               <sec.icon className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-1">{sec.title}</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{sec.desc}</p>
+            <h3 className="text-xl font-black text-[var(--text-main)] mb-1">{sec.title}</h3>
+            <p className="text-xs text-[var(--text-dim)] font-medium">{sec.desc}</p>
             <ChevronRight className={`absolute bottom-6 right-6 w-5 h-5 ${sec.color} opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0`} />
           </button>
         ))}
@@ -98,23 +98,23 @@ const PracticeHub = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-6">
           <h2 className="text-xl font-black flex items-center gap-2">
-            <Zap className="w-5 h-5 text-indigo-600" /> Advanced Tools
+            <Zap className="w-5 h-5 text-[var(--primary)]" /> Advanced Tools
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {tools.map((tool, i) => (
               <button
                 key={i}
                 onClick={() => navigate(tool.path)}
-                className="p-5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all text-left group"
+                className="p-5 glass-morphism rounded-2xl border border-[var(--border)] shadow-sm hover:shadow-md transition-all text-left group"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <div className="p-2 glass-morphism rounded-lg group-hover:bg-[var(--primary)] group-hover:text-white transition-colors">
                     <tool.icon className="w-5 h-5" />
                   </div>
-                  {tool.premiumOnly && !isPremium && <Lock className="w-3 h-3 text-gray-400" />}
+                  {tool.premiumOnly && !isPremium && <Lock className="w-3 h-3 text-[var(--text-dim)]" />}
                 </div>
                 <h4 className="font-bold text-sm mb-1">{tool.title}</h4>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400">{tool.desc}</p>
+                <p className="text-[10px] text-[var(--text-dim)]">{tool.desc}</p>
               </button>
             ))}
           </div>
@@ -122,16 +122,16 @@ const PracticeHub = () => {
 
         {/* Prediction Bank Preview (Premium) */}
         <PremiumLock isPremium={isPremium}>
-          <div className="bg-gradient-to-br from-indigo-900 to-indigo-700 rounded-3xl p-8 text-white relative overflow-hidden h-full">
+          <div className="bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] rounded-3xl p-8 text-white relative overflow-hidden h-full">
             <div className="relative z-10">
-              <div className="bg-yellow-400 text-indigo-900 text-[10px] font-black px-3 py-1 rounded-full inline-block mb-4">
+              <div className="bg-yellow-400 text-[var(--text-main)] text-[10px] font-black px-3 py-1 rounded-full inline-block mb-4">
                 PREMIUM PREDICTION BANK
               </div>
               <h3 className="text-2xl font-black mb-4">Real Exam Questions</h3>
               <p className="opacity-80 text-sm mb-6 leading-relaxed">
                 Unlock the latest questions appearing in exams this week. Our prediction bank has a 85% match rate with real PTE tasks.
               </p>
-              <button className="bg-white text-indigo-900 px-6 py-3 rounded-xl font-black text-sm hover:bg-indigo-50 transition-colors">
+              <button className="bg-white text-[var(--accent)] px-6 py-3 rounded-xl font-black text-sm hover:opacity-90 transition-colors">
                 Open Daily Predictions
               </button>
             </div>

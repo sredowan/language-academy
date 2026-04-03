@@ -5,11 +5,16 @@ const Expense = require('../models/Expense');
 const Account = require('../models/Account');
 const Branch = require('../models/Branch');
 const User = require('../models/User');
+const Student = require('../models/Student');
+const Enrollment = require('../models/Enrollment');
+const Batch = require('../models/Batch');
+const Course = require('../models/Course');
 const BankAccount = require('../models/BankAccount');
 const BankAccountLedgerMap = require('../models/BankAccountLedgerMap');
 const ReconciliationSession = require('../models/ReconciliationSession');
 const ReconciliationLine = require('../models/ReconciliationLine');
 const ReconciliationEvent = require('../models/ReconciliationEvent');
+const LiquidityMovement = require('../models/LiquidityMovement');
 const JournalLine = require('../models/JournalLine');
 const JournalEntry = require('../models/JournalEntry');
 const AuditLog = require('../models/AuditLog');
@@ -566,7 +571,7 @@ exports.updateLineNotes = async (req, res) => {
 exports.getStats = async (req, res) => {
   try {
     const branchId = getBranchId(req);
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
 
     // Today's totals
     const todayTx = await Transaction.findAll({
@@ -640,6 +645,656 @@ exports.getBankAccounts = async (req, res) => {
   try {
     const accounts = await BankAccount.findAll();
     res.json(accounts);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+const LIQUID_ACCOUNT_FILTER = {
+  type: 'asset',
+  is_active: true,
+  [Op.or]: [
+    { code: { [Op.like]: '10%' } },
+    { sub_type: { [Op.in]: ['cash', 'bank', 'mfs'] } },
+  ],
+};
+
+function formatDateLocal(dateObj) {
+  const d = new Date(dateObj);
+  // Apply UTC+6 offset for Bangladesh Standard Time
+  const bdTime = new Date(d.getTime() + 6 * 60 * 60 * 1000);
+  return bdTime.getUTCFullYear() + '-' + String(bdTime.getUTCMonth() + 1).padStart(2, '0') + '-' + String(bdTime.getUTCDate()).padStart(2, '0');
+}
+
+function getTodayLocal() {
+  // Get current time in Bangladesh (UTC+6)
+  const now = new Date();
+  const bdTime = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+  return bdTime.getUTCFullYear() + '-' + String(bdTime.getUTCMonth() + 1).padStart(2, '0') + '-' + String(bdTime.getUTCDate()).padStart(2, '0');
+}
+
+function toDateOnly(value) {
+  if (!value) return getTodayLocal();
+  // If the value is already a YYYY-MM-DD string, return it directly
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return formatDateLocal(value);
+}
+
+function isWithinRange(date, from, to) {
+  return (!from || date >= from) && (!to || date <= to);
+}
+
+async function getLiquidAccounts(branchId) {
+  return Account.findAll({ where: { ...LIQUID_ACCOUNT_FILTER, branch_id: branchId }, order: [['code', 'ASC']] });
+}
+
+async function ensureSessionForDate(branchId, reconDate, userId) {
+  const [session] = await ReconciliationSession.findOrCreate({
+    where: { branch_id: branchId, recon_date: reconDate },
+    defaults: { branch_id: branchId, recon_date: reconDate, status: 'draft', prepared_by: userId }
+  });
+  return session;
+}
+
+async function ensureLineForAccount(session, accountId, channel) {
+  const [line] = await ReconciliationLine.findOrCreate({
+    where: { session_id: session.id, account_id: accountId },
+    defaults: { session_id: session.id, account_id: accountId, channel, status: 'matched' }
+  });
+  return line;
+}
+
+async function buildLiquidityRows(branchId, toDate) {
+  const liquidAccounts = await getLiquidAccounts(branchId);
+  const accountIds = liquidAccounts.map((account) => account.id);
+  if (!accountIds.length) {
+    return { liquidAccounts, rows: [] };
+  }
+
+  const [transactions, expenses, manualMovements] = await Promise.all([
+    Transaction.findAll({
+      where: { branch_id: branchId, status: 'success', account_id: { [Op.in]: accountIds }, paid_at: { [Op.lte]: `${toDate} 23:59:59` } },
+      include: [{ model: Account, attributes: ['id', 'name', 'code', 'sub_type'] }, { model: Enrollment, required: false, include: [{ model: Student, required: false, include: [{ model: User, attributes: ['name'] }] }, { model: Batch, required: false, include: [{ model: Course, attributes: ['title'], required: false }] }] }],
+      order: [['paid_at', 'ASC'], ['id', 'ASC']]
+    }),
+    Expense.findAll({
+      where: { branch_id: branchId, account_id: { [Op.in]: accountIds }, status: { [Op.in]: ['approved', 'verified'] }, date: { [Op.lte]: toDate } },
+      include: [{ model: Account, attributes: ['id', 'name', 'code', 'sub_type'] }],
+      order: [['date', 'ASC'], ['id', 'ASC']]
+    }),
+    LiquidityMovement.findAll({
+      where: { branch_id: branchId, account_id: { [Op.in]: accountIds }, movement_date: { [Op.lte]: toDate } },
+      include: [{ model: Account, attributes: ['id', 'name', 'code', 'sub_type'] }, { model: Account, as: 'RelatedAccount', attributes: ['id', 'name', 'code', 'sub_type'], required: false }, { model: User, as: 'Creator', attributes: ['name'], required: false }],
+      order: [['movement_date', 'ASC'], ['id', 'ASC']]
+    })
+  ]);
+
+  const rows = [];
+  transactions.forEach((tx) => {
+    const studentName = tx.Enrollment?.Student?.User?.name || 'Walk-in / Manual';
+    const courseTitle = tx.Enrollment?.Batch?.Course?.title || 'General Income';
+    const account = tx.Account;
+    const subType = account?.sub_type || 'cash';
+    rows.push({
+      unique_key: `tx-${tx.id}`,
+      account_id: tx.account_id,
+      movement_date: toDateOnly(tx.paid_at),
+      event_time: new Date(tx.paid_at || tx.created_at || Date.now()).getTime(),
+      transaction_type: subType === 'bank' ? 'direct_bank_receipt' : subType === 'mfs' ? 'mobile_receipt' : 'collection',
+      direction: 'inflow',
+      amount: Number(tx.amount || 0),
+      reference: tx.transaction_ref || tx.receipt_no,
+      remarks: `${studentName} · ${courseTitle}`,
+      source_model: 'Transaction',
+      source_id: String(tx.id),
+      account_name: account?.name || 'Unknown Account',
+      account_code: account?.code || '',
+      account_type: subType,
+      created_by_name: 'System',
+    });
+  });
+
+  expenses.forEach((expense) => {
+    const account = expense.Account;
+    rows.push({
+      unique_key: `expense-${expense.id}`,
+      account_id: expense.account_id,
+      movement_date: toDateOnly(expense.date),
+      event_time: new Date(expense.date).getTime(),
+      transaction_type: 'expense',
+      direction: 'outflow',
+      amount: Number(expense.amount || 0),
+      reference: expense.category,
+      remarks: expense.description,
+      source_model: 'Expense',
+      source_id: String(expense.id),
+      account_name: account?.name || 'Unknown Account',
+      account_code: account?.code || '',
+      account_type: account?.sub_type || 'cash',
+      created_by_name: 'System',
+    });
+  });
+
+  manualMovements.forEach((movement) => {
+    rows.push({
+      unique_key: `manual-${movement.id}`,
+      account_id: movement.account_id,
+      movement_date: movement.movement_date,
+      event_time: new Date(movement.created_at || movement.movement_date).getTime(),
+      transaction_type: movement.transaction_type,
+      direction: movement.direction,
+      amount: Number(movement.amount || 0),
+      actual_balance: Number(movement.actual_balance || 0),
+      variance_amount: Number(movement.variance_amount || 0),
+      previous_balance: Number(movement.previous_balance || 0),
+      new_balance: Number(movement.new_balance || 0),
+      reference: movement.reference,
+      remarks: movement.remarks,
+      reason: movement.reason,
+      source_model: movement.source_model || 'LiquidityMovement',
+      source_id: movement.source_id || String(movement.id),
+      account_name: movement.Account?.name || 'Unknown Account',
+      account_code: movement.Account?.code || '',
+      account_type: movement.Account?.sub_type || 'cash',
+      related_account_name: movement.RelatedAccount?.name || '',
+      created_by_name: movement.Creator?.name || 'System',
+    });
+  });
+
+  rows.sort((a, b) => {
+    if (a.movement_date !== b.movement_date) return a.movement_date.localeCompare(b.movement_date);
+    if (a.event_time !== b.event_time) return a.event_time - b.event_time;
+    return a.unique_key.localeCompare(b.unique_key);
+  });
+
+  return { liquidAccounts, rows };
+}
+
+async function buildLiquiditySnapshot(branchId, from, to) {
+  const { liquidAccounts, rows } = await buildLiquidityRows(branchId, to);
+  const accountMap = new Map(liquidAccounts.map((account) => [account.id, account]));
+  const balances = {};
+  const summaries = new Map();
+  const rangeRows = [];
+
+  const lastClosings = await LiquidityMovement.findAll({
+    where: {
+      branch_id: branchId,
+      transaction_type: 'closing_submission',
+      movement_date: { [Op.lt]: from }
+    },
+    order: [['movement_date', 'DESC'], ['id', 'DESC']],
+    attributes: ['account_id', 'actual_balance', 'movement_date'],
+    raw: true
+  });
+
+  const lastClosingMap = {};
+  lastClosings.forEach((lc) => {
+    if (!lastClosingMap[lc.account_id]) {
+      lastClosingMap[lc.account_id] = lc;
+    }
+  });
+
+  liquidAccounts.forEach((account) => {
+    const lastClosing = lastClosingMap[account.id];
+    summaries.set(account.id, {
+      account_id: account.id,
+      account_name: account.name,
+      account_code: account.code,
+      account_type: account.sub_type || 'cash',
+      opening_balance: 0,
+      inflows: 0,
+      outflows: 0,
+      expected_closing_balance: 0,
+      actual_closing_balance: null,
+      discrepancy_amount: 0,
+      discrepancy_reason: '',
+      last_reference: '',
+      status: 'open',
+      last_actual_closing: lastClosing ? Number(lastClosing.actual_balance || 0) : null,
+      last_actual_closing_date: lastClosing?.movement_date || null,
+      continuity_variance: lastClosing ? 0 - Number(lastClosing.actual_balance || 0) : 0,
+      opening_source: lastClosing ? 'carry_forward' : 'not_set',
+      opening_source_label: lastClosing ? 'Carry forward' : 'Not set',
+      opening_recorded_by: lastClosing ? 'System' : null,
+      opening_adjustments_total: 0,
+      system_generated_inflows: 0,
+      manual_inflows: 0,
+      system_generated_outflows: 0,
+      manual_outflows: 0,
+      closing_source: 'pending',
+      closing_source_label: 'Pending',
+      closing_recorded_by: null,
+      closing_recorded_at: null
+    });
+  });
+
+  rows.forEach((row) => {
+    const summary = summaries.get(row.account_id);
+    if (!summary) return;
+    const previousBalance = balances[row.account_id] || 0;
+    const signedAmount = row.direction === 'inflow' ? row.amount : row.direction === 'outflow' ? -row.amount : 0;
+    
+    // Crucial Bug Fix: A closing submission from a previous day must RESET the running balance to the actual physical count submitted by the user.
+    // Otherwise, carry forwards ignore manual reconciliation and discrepancies compound forever.
+    const computedBalance = row.transaction_type === 'closing_submission' 
+      ? Number(row.actual_balance || 0) 
+      : previousBalance + signedAmount;
+      
+    const isOpeningEntry = ['opening_balance', 'opening_adjustment'].includes(row.transaction_type);
+    const normalizedRow = {
+      ...row,
+      previous_balance: previousBalance,
+      new_balance: computedBalance,
+      amount: Number(row.amount || 0),
+      account_name: row.account_name || accountMap.get(row.account_id)?.name || 'Unknown Account',
+      account_code: row.account_code || accountMap.get(row.account_id)?.code || '',
+      account_type: row.account_type || accountMap.get(row.account_id)?.sub_type || 'cash'
+    };
+    balances[row.account_id] = computedBalance;
+
+    if (row.movement_date < from) {
+      summary.opening_balance = computedBalance;
+      summary.expected_closing_balance = computedBalance;
+      summary.continuity_variance = summary.opening_balance - Number(summary.last_actual_closing || 0);
+      return;
+    }
+
+    if (!isWithinRange(row.movement_date, from, to)) return;
+
+    if (isOpeningEntry && row.movement_date === from) {
+      summary.opening_balance = computedBalance;
+      summary.expected_closing_balance = computedBalance;
+      summary.opening_adjustments_total += signedAmount;
+      summary.opening_source = row.transaction_type;
+      summary.opening_source_label = row.transaction_type === 'opening_balance' ? 'Manual opening' : 'Opening adjustment';
+      summary.opening_recorded_by = row.created_by_name || 'System';
+      summary.continuity_variance = summary.opening_balance - Number(summary.last_actual_closing || 0);
+      summary.last_reference = normalizedRow.reference || summary.last_reference;
+      rangeRows.push(normalizedRow);
+      return;
+    }
+
+    if (normalizedRow.direction === 'inflow') {
+      summary.inflows += normalizedRow.amount;
+      if (['Transaction', 'Expense'].includes(normalizedRow.source_model)) summary.system_generated_inflows += normalizedRow.amount;
+      else summary.manual_inflows += normalizedRow.amount;
+    }
+    if (normalizedRow.direction === 'outflow') {
+      summary.outflows += normalizedRow.amount;
+      if (['Transaction', 'Expense'].includes(normalizedRow.source_model)) summary.system_generated_outflows += normalizedRow.amount;
+      else summary.manual_outflows += normalizedRow.amount;
+    }
+
+    // Do NOT overwrite expected_closing_balance inside the loop.
+    summary.last_reference = normalizedRow.reference || summary.last_reference;
+
+    if (normalizedRow.transaction_type === 'closing_submission') {
+      summary.actual_closing_balance = Number(normalizedRow.actual_balance || 0);
+      summary.discrepancy_amount = Number(normalizedRow.variance_amount || 0);
+      summary.discrepancy_reason = normalizedRow.reason || normalizedRow.remarks || '';
+      summary.status = Math.abs(summary.discrepancy_amount) > 0.009 ? 'discrepancy' : 'reconciled';
+      summary.closing_source = 'closing_submission';
+      summary.closing_source_label = 'Manual submission';
+      summary.closing_recorded_by = normalizedRow.created_by_name || 'System';
+      summary.closing_recorded_at = normalizedRow.movement_date;
+    }
+
+    rangeRows.push(normalizedRow);
+  });
+
+  summaries.forEach((summary) => {
+    if (summary.actual_closing_balance === null) {
+      summary.status = summary.inflows || summary.outflows ? 'open' : 'idle';
+    }
+    // FIX: Expected closing balance MUST strictly follow the mathematical formula for the current period
+    // to prevent closing submissions from overwriting the expected amount and hiding discrepancies.
+    summary.expected_closing_balance = summary.opening_balance + summary.inflows - summary.outflows;
+  });
+
+  const auditWhere = { branch_id: branchId, entity: { [Op.in]: ['LiquidityMovement', 'ReconciliationSession', 'ReconciliationLine'] } };
+  if (from || to) {
+    auditWhere.created_at = {};
+    if (from) auditWhere.created_at[Op.gte] = `${from} 00:00:00`;
+    if (to) auditWhere.created_at[Op.lte] = `${to} 23:59:59`;
+  }
+
+  const auditTrail = await AuditLog.findAll({
+    where: auditWhere,
+    include: [{ model: User, attributes: ['name'], required: false }],
+    order: [['created_at', 'DESC']],
+    limit: 250
+  });
+
+  const movementsRaw = rangeRows.sort((a, b) => b.movement_date.localeCompare(a.movement_date) || b.event_time - a.event_time);
+  
+  // Inject explicit Carry Forward rows to demystify running balance calculations for accountants
+  const carryForwardRows = [];
+  Array.from(summaries.values()).forEach(summary => {
+    if (summary.opening_balance !== 0 || summary.last_actual_closing_date) {
+      carryForwardRows.push({
+        unique_key: `cf-${summary.account_id}-${from}`,
+        account_id: summary.account_id,
+        movement_date: from || getTodayLocal(),
+        event_time: 0, // Sorts to the very beginning of the day time-wise
+        transaction_type: 'carry_forward',
+        direction: 'neutral',
+        amount: 0,
+        previous_balance: summary.opening_balance,
+        new_balance: summary.opening_balance,
+        reference: 'SYS-CF',
+        remarks: `Balance carried forward from previous period`,
+        source_model: 'System',
+        account_name: summary.account_name,
+        account_code: summary.account_code,
+        created_by_name: 'System',
+      });
+    }
+  });
+  
+  const movements = [...movementsRaw, ...carryForwardRows].sort((a, b) => b.movement_date.localeCompare(a.movement_date) || b.event_time - a.event_time);
+
+  const operationalMovements = movements.filter((row) => !['opening_balance', 'opening_adjustment', 'carry_forward'].includes(row.transaction_type));
+  const transfers = movements.filter((row) => ['transfer_in', 'transfer_out'].includes(row.transaction_type));
+  const directBankReceipts = movements.filter((row) => ['direct_bank_receipt', 'mobile_receipt'].includes(row.transaction_type));
+  const adjustments = movements.filter((row) => ['opening_balance', 'opening_adjustment', 'closing_adjustment', 'manual_adjustment', 'reversal'].includes(row.transaction_type));
+  const discrepancies = Array.from(summaries.values()).filter((summary) => Math.abs(Number(summary.discrepancy_amount || 0)) > 0.009);
+  const dailySummaryMap = new Map();
+  operationalMovements.forEach((row) => {
+    const daily = dailySummaryMap.get(row.movement_date) || { date: row.movement_date, inflows: 0, outflows: 0, transfers: 0, discrepancies: 0 };
+    if (row.direction === 'inflow') daily.inflows += row.amount;
+    if (row.direction === 'outflow') daily.outflows += row.amount;
+    if (['transfer_in', 'transfer_out'].includes(row.transaction_type)) daily.transfers += row.amount;
+    if (row.transaction_type === 'closing_submission' && Math.abs(Number(row.variance_amount || 0)) > 0.009) daily.discrepancies += Number(row.variance_amount || 0);
+    dailySummaryMap.set(row.movement_date, daily);
+  });
+
+  const openingClosingReport = Array.from(summaries.values()).map((summary) => ({
+    report_from: from,
+    report_to: to,
+    account_id: summary.account_id,
+    account_name: summary.account_name,
+    account_code: summary.account_code,
+    account_type: summary.account_type,
+    previous_closing_date: summary.last_actual_closing_date,
+    previous_closing_balance: summary.last_actual_closing,
+    opening_balance: summary.opening_balance,
+    opening_source: summary.opening_source,
+    opening_source_label: summary.opening_source_label,
+    opening_recorded_by: summary.opening_recorded_by,
+    opening_adjustments_total: summary.opening_adjustments_total,
+    continuity_variance: summary.continuity_variance,
+    inflows: summary.inflows,
+    outflows: summary.outflows,
+    expected_closing_balance: summary.expected_closing_balance,
+    actual_closing_balance: summary.actual_closing_balance,
+    discrepancy_amount: summary.discrepancy_amount,
+    discrepancy_reason: summary.discrepancy_reason,
+    closing_source: summary.closing_source,
+    closing_source_label: summary.closing_source_label,
+    closing_recorded_by: summary.closing_recorded_by,
+    closing_recorded_at: summary.closing_recorded_at,
+    has_continuity_exception: Math.abs(Number(summary.continuity_variance || 0)) > 0.009,
+    has_closing_exception: Math.abs(Number(summary.discrepancy_amount || 0)) > 0.009,
+  }));
+
+  return {
+    summary: {
+      total_accounts: liquidAccounts.length,
+      total_inflows: operationalMovements.reduce((sum, row) => sum + (row.direction === 'inflow' ? row.amount : 0), 0),
+      total_outflows: operationalMovements.reduce((sum, row) => sum + (row.direction === 'outflow' ? row.amount : 0), 0),
+      total_discrepancy: discrepancies.reduce((sum, row) => sum + Math.abs(Number(row.discrepancy_amount || 0)), 0),
+      reconciled_accounts: Array.from(summaries.values()).filter((row) => row.status === 'reconciled').length,
+      open_accounts: Array.from(summaries.values()).filter((row) => row.status === 'open').length,
+    },
+    accounts: Array.from(summaries.values()),
+    movements,
+    transfers,
+    direct_bank_receipts: directBankReceipts,
+    discrepancies,
+    adjustment_history: adjustments,
+    opening_closing_report: openingClosingReport,
+    daily_summary: Array.from(dailySummaryMap.values()).sort((a, b) => b.date.localeCompare(a.date)),
+    full_audit_trail: auditTrail.map((item) => ({
+      id: item.id,
+      timestamp: item.created_at,
+      user_name: item.User?.name || 'System',
+      action: item.action,
+      entity: item.entity,
+      entity_id: item.entity_id,
+      old_value: item.old_value,
+      new_value: item.new_value,
+    }))
+  };
+}
+
+async function createManualMovement(req, payload) {
+  const branchId = getBranchId(req);
+  const movementDate = payload.movement_date || toDateOnly(new Date());
+  const snapshot = await buildLiquiditySnapshot(branchId, movementDate, movementDate);
+  const accountSummary = snapshot.accounts.find((item) => item.account_id === Number(payload.account_id));
+  const previousBalance = Number(payload.previous_balance ?? accountSummary?.expected_closing_balance ?? accountSummary?.opening_balance ?? 0);
+  const signedAmount = payload.direction === 'inflow'
+    ? Number(payload.amount || 0)
+    : payload.direction === 'outflow'
+      ? -Number(payload.amount || 0)
+      : 0;
+  const computedNewBalance = Number(payload.new_balance ?? (previousBalance + signedAmount));
+
+  const movement = await LiquidityMovement.create({
+    ...payload,
+    branch_id: branchId,
+    movement_date: movementDate,
+    previous_balance: previousBalance,
+    new_balance: computedNewBalance,
+    created_by: req.user?.id,
+    updated_by: req.user?.id,
+  });
+  await writeAudit(req, 'LiquidityMovement', movement.id, 'create', null, movement.toJSON());
+  return movement;
+}
+
+exports.getLiquidityDashboard = async (req, res) => {
+  try {
+    const from = toDateOnly(req.query.from);
+    const to = toDateOnly(req.query.to || req.query.from);
+    const snapshot = await buildLiquiditySnapshot(getBranchId(req), from, to);
+    res.json({ range: { from, to }, ...snapshot });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+exports.recordOpeningBalance = async (req, res) => {
+  try {
+    const branchId = getBranchId(req);
+    const { account_id, date, opening_balance, reason } = req.body;
+    if (!account_id || opening_balance === undefined) return res.status(400).json({ error: 'account_id and opening_balance are required' });
+
+    const targetDate = toDateOnly(date);
+    const snapshot = await buildLiquiditySnapshot(branchId, targetDate, targetDate);
+    const summary = snapshot.accounts.find((item) => item.account_id === Number(account_id));
+    if (!summary) return res.status(404).json({ error: 'Liquid account not found' });
+
+    const desiredOpening = Number(opening_balance || 0);
+    const diff = desiredOpening - Number(summary.opening_balance || 0);
+    if (Math.abs(diff) < 0.009) return res.json({ message: 'Opening balance already matches system value.' });
+
+    const previousClosing = await LiquidityMovement.findOne({
+      where: {
+        branch_id: branchId,
+        account_id: Number(account_id),
+        transaction_type: 'closing_submission',
+        movement_date: { [Op.lt]: targetDate }
+      },
+      order: [['movement_date', 'DESC'], ['id', 'DESC']],
+      raw: true
+    });
+
+    if (previousClosing) {
+      const previousActual = Number(previousClosing.actual_balance || 0);
+      if (Math.abs(desiredOpening - previousActual) > 0.009) {
+        return res.status(400).json({
+          error: `Opening balance mismatch. Previous closing on ${previousClosing.movement_date} was ${previousActual}. Record the source through collection, transfer, or an adjustment workflow instead of resetting opening balance.`,
+          previous_closing_date: previousClosing.movement_date,
+          previous_closing_balance: previousActual,
+          requested_opening_balance: desiredOpening,
+        });
+      }
+    }
+
+    if (!reason?.trim()) return res.status(400).json({ error: 'Reason is required for opening balance adjustment' });
+
+    const account = await Account.findByPk(account_id);
+    const session = await ensureSessionForDate(branchId, targetDate, req.user?.id);
+    const line = await ensureLineForAccount(session, account.id, account.sub_type || 'cash');
+
+    const movement = await createManualMovement(req, {
+      account_id: Number(account_id),
+      movement_date: targetDate,
+      transaction_type: Number(line.opening_balance || 0) !== 0 ? 'opening_adjustment' : 'opening_balance',
+      direction: diff >= 0 ? 'inflow' : 'outflow',
+      amount: Math.abs(diff),
+      reference: `OPEN-${targetDate}`,
+      remarks: `Opening balance set to ${desiredOpening}`,
+      reason,
+    });
+
+    await line.update({ opening_balance: desiredOpening, notes: reason });
+    await writeEvent(session.id, branchId, req.user?.id, 'opening_balance_update', reason, { opening_balance: summary.opening_balance }, { opening_balance: desiredOpening, movement_id: movement.id });
+    res.status(201).json({ message: 'Opening balance adjustment recorded.', movement_id: movement.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+exports.recordCollection = async (req, res) => {
+  try {
+    const { account_id, date, amount, source, reference, remarks, transaction_type } = req.body;
+    if (!account_id || !amount) return res.status(400).json({ error: 'account_id and amount are required' });
+    const account = await Account.findByPk(account_id);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+    const type = transaction_type || (account.sub_type === 'bank' ? 'direct_bank_receipt' : account.sub_type === 'mfs' ? 'mobile_receipt' : 'collection');
+    const movement = await createManualMovement(req, {
+      account_id: Number(account_id),
+      movement_date: toDateOnly(date),
+      transaction_type: type,
+      direction: 'inflow',
+      amount: Number(amount),
+      reference: reference || source || null,
+      remarks: remarks || source || 'Manual collection entry',
+      source_model: 'ManualEntry',
+      source_id: null,
+    });
+    res.status(201).json({ message: 'Collection recorded successfully.', movement_id: movement.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+exports.recordTransfer = async (req, res) => {
+  try {
+    const { from_account_id, to_account_id, date, amount, reference, remarks } = req.body;
+    if (!from_account_id || !to_account_id || !amount) return res.status(400).json({ error: 'from_account_id, to_account_id, and amount are required' });
+    if (Number(from_account_id) === Number(to_account_id)) return res.status(400).json({ error: 'Source and destination must be different' });
+    const [fromAccount, toAccount] = await Promise.all([Account.findByPk(from_account_id), Account.findByPk(to_account_id)]);
+    if (!fromAccount || !toAccount) return res.status(404).json({ error: 'Transfer account not found' });
+
+    const transferDate = toDateOnly(date);
+    const ref = reference || `TRF-${Date.now()}`;
+    const commonRemarks = remarks || `${fromAccount.name} -> ${toAccount.name}`;
+
+    const outflow = await createManualMovement(req, {
+      account_id: Number(from_account_id),
+      related_account_id: Number(to_account_id),
+      movement_date: transferDate,
+      transaction_type: 'transfer_out',
+      direction: 'outflow',
+      amount: Number(amount),
+      reference: ref,
+      remarks: commonRemarks,
+      source_model: 'LiquidityTransfer',
+      source_id: ref,
+    });
+
+    const inflow = await createManualMovement(req, {
+      account_id: Number(to_account_id),
+      related_account_id: Number(from_account_id),
+      movement_date: transferDate,
+      transaction_type: 'transfer_in',
+      direction: 'inflow',
+      amount: Number(amount),
+      reference: ref,
+      remarks: commonRemarks,
+      source_model: 'LiquidityTransfer',
+      source_id: ref,
+    });
+
+    res.status(201).json({ message: 'Transfer recorded successfully.', outflow_id: outflow.id, inflow_id: inflow.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+exports.recordClosingBalance = async (req, res) => {
+  try {
+    const branchId = getBranchId(req);
+    const { account_id, date, actual_closing_balance, reason } = req.body;
+    if (!account_id || actual_closing_balance === undefined) return res.status(400).json({ error: 'account_id and actual_closing_balance are required' });
+
+    const targetDate = toDateOnly(date);
+    const snapshot = await buildLiquiditySnapshot(branchId, targetDate, targetDate);
+    const summary = snapshot.accounts.find((item) => item.account_id === Number(account_id));
+    if (!summary) return res.status(404).json({ error: 'Liquid account not found' });
+
+    const expected = Number(summary.expected_closing_balance || summary.opening_balance || 0);
+    const actual = Number(actual_closing_balance || 0);
+    const variance = actual - expected;
+    if (Math.abs(variance) > 0.009 && !reason?.trim()) return res.status(400).json({ error: 'Explanation is required when there is a discrepancy' });
+
+    const account = await Account.findByPk(account_id);
+    const session = await ensureSessionForDate(branchId, targetDate, req.user?.id);
+    const line = await ensureLineForAccount(session, account.id, account.sub_type || 'cash');
+    const movement = await createManualMovement(req, {
+      account_id: Number(account_id),
+      movement_date: targetDate,
+      transaction_type: 'closing_submission',
+      direction: 'neutral',
+      amount: 0,
+      previous_balance: expected,
+      new_balance: expected,
+      actual_balance: actual,
+      variance_amount: variance,
+      reference: `CLOSE-${targetDate}`,
+      remarks: `Closing submitted for ${account.name}`,
+      reason: reason || '',
+    });
+
+    await line.update({
+      opening_balance: Number(summary.opening_balance || 0),
+      expected_closing_balance: expected,
+      actual_closing_balance: actual,
+      discrepancy_amount: variance,
+      discrepancy_reason: reason || '',
+      status: Math.abs(variance) > 0.009 ? 'variance_major' : 'matched',
+      submitted_by: req.user?.id,
+      submitted_at: new Date(),
+    });
+
+    await session.update({ total_variance: Number(session.total_variance || 0) + Math.abs(variance) });
+    await writeEvent(session.id, branchId, req.user?.id, 'closing_submission', reason || 'Closing submitted', { expected }, { actual, variance, movement_id: movement.id });
+    res.status(201).json({ message: 'Closing balance submitted.', variance, movement_id: movement.id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+exports.getLiquidityReports = async (req, res) => {
+  try {
+    const from = toDateOnly(req.query.from);
+    const to = toDateOnly(req.query.to || req.query.from);
+    const snapshot = await buildLiquiditySnapshot(getBranchId(req), from, to);
+    res.json({ range: { from, to }, ...snapshot });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

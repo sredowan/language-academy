@@ -7,8 +7,29 @@ const Expense = require('../models/Expense');
 const Enrollment = require('../models/Enrollment');
 const Student = require('../models/Student');
 const User = require('../models/User');
+const Batch = require('../models/Batch');
+const Course = require('../models/Course');
+const LiquidityMovement = require('../models/LiquidityMovement');
 const sequelize = require('../config/db.config');
 const { Op, fn, col, literal } = require('sequelize');
+
+const PREMIUM_PLAN_PRICE = 2500;
+
+const getBranchId = (req) => req.scopedBranchId || req.branchId;
+
+const createDateRangeFilter = (from, to) => {
+  const dateFilter = {};
+  if (from) dateFilter[Op.gte] = from;
+  if (to) dateFilter[Op.lte] = to;
+  return Object.keys(dateFilter).length ? dateFilter : null;
+};
+
+const buildSourceLabel = (transaction) => {
+  if (transaction?.source === 'premium_plan') return 'PTE Premium Subscription';
+  if (transaction?.source === 'website') return 'Website Payment';
+  if (transaction?.source === 'manual') return 'Manual Income';
+  return 'Student Course Fee';
+};
 
 // ── Existing: Record Expense (journal entry based) ──
 exports.recordExpense = async (req, res) => {
@@ -63,20 +84,28 @@ exports.getFinanceStats = async (req, res) => {
 // ── NEW: Accounts Overview Dashboard ──
 exports.getOverview = async (req, res) => {
   try {
-    const revenue = await JournalLine.sum('credit', { include: [{ model: Account, where: { type: 'revenue' } }] }) || 0;
-    const expenses = await JournalLine.sum('debit', { include: [{ model: Account, where: { type: 'expense' } }] }) || 0;
-    const receivables = await Invoice.sum('amount', { where: { status: { [Op.in]: ['pending', 'overdue', 'partial'] } } }) || 0;
-    const receivablesPaid = await Invoice.sum('paid', { where: { status: { [Op.in]: ['pending', 'overdue', 'partial'] } } }) || 0;
-    const totalInvoices = await Invoice.count();
-    const unpaidInvoices = await Invoice.count({ where: { status: { [Op.in]: ['pending', 'overdue'] } } });
-    const feeCollected = await Transaction.sum('amount', { where: { status: 'success' } }) || 0;
-    const salaryExpense = await Expense.sum('amount', { where: { category: { [Op.like]: '%Salary%' } } }) || 0;
-    const scholarshipGiven = await Expense.sum('amount', { where: { category: { [Op.like]: '%Scholarship%' } } }) || 0;
+    const branchFilter = req.branchId ? { branch_id: req.branchId } : {};
+    const revenue = await JournalLine.sum('credit', { include: [{ model: Account, where: { ...branchFilter, type: 'revenue' } }] }) || 0;
+    const expenses = await JournalLine.sum('debit', { include: [{ model: Account, where: { ...branchFilter, type: 'expense' } }] }) || 0;
+    const totalInvoices = await Invoice.count({ where: branchFilter });
+    const feeCollected = await Transaction.sum('amount', { where: { ...branchFilter, status: 'success' } }) || 0;
+    const salaryExpense = await Expense.sum('amount', { where: { ...branchFilter, category: { [Op.like]: '%Salary%' } } }) || 0;
+    const scholarshipGiven = await Expense.sum('amount', { where: { ...branchFilter, category: { [Op.like]: '%Scholarship%' } } }) || 0;
+    const openInvoices = await Invoice.findAll({
+      where: { ...branchFilter, status: { [Op.notIn]: ['paid', 'rejected'] } },
+      attributes: ['amount', 'paid', 'status']
+    });
+
+    const receivablesDue = openInvoices.reduce((sum, invoice) => sum + Math.max(Number(invoice.amount || 0) - Number(invoice.paid || 0), 0), 0);
+    const unpaidInvoices = openInvoices.filter((invoice) => Math.max(Number(invoice.amount || 0) - Number(invoice.paid || 0), 0) > 0).length;
+    const overdueReceivables = openInvoices
+      .filter((invoice) => invoice.status === 'overdue')
+      .reduce((sum, invoice) => sum + Math.max(Number(invoice.amount || 0) - Number(invoice.paid || 0), 0), 0);
 
     res.json({
       revenue, expenses, netProfit: revenue - expenses,
-      receivablesDue: receivables - receivablesPaid,
-      overdueReceivables: await Invoice.sum('amount', { where: { status: 'overdue' } }) || 0,
+      receivablesDue,
+      overdueReceivables,
       totalInvoices, unpaidInvoices, feeCollected, salaryExpense, scholarshipGiven
     });
   } catch (error) {
@@ -153,20 +182,103 @@ exports.getTrialBalance = async (req, res) => {
   }
 };
 
-// ── NEW: Cash Flow ──
+// ── NEW: Cash Flow (Enhanced / Detailed) ──
 exports.getCashFlow = async (req, res) => {
   try {
-    // Get cash/bank account IDs
-    const cashAccounts = await Account.findAll({ where: { type: 'asset', name: { [Op.like]: '%Cash%' } } });
-    const cashIds = cashAccounts.map(a => a.id);
+    const branchId = getBranchId(req);
+    const { from, to } = req.query;
+    const txWhere = { branch_id: branchId, status: 'success' };
+    const expWhere = { branch_id: branchId, status: { [Op.in]: ['approved', 'verified'] } };
+    if (from) { txWhere.paid_at = { ...(txWhere.paid_at || {}), [Op.gte]: from }; expWhere.date = { ...(expWhere.date || {}), [Op.gte]: from }; }
+    if (to) { txWhere.paid_at = { ...(txWhere.paid_at || {}), [Op.lte]: to }; expWhere.date = { ...(expWhere.date || {}), [Op.lte]: to }; }
 
-    if (!cashIds.length) return res.json({ inflows: 0, outflows: 0, net: 0, monthly: [] });
+    const [transactions, expenses] = await Promise.all([
+      Transaction.findAll({
+        where: txWhere,
+        include: [
+          { model: Enrollment, required: false, include: [{ model: Student, required: false, include: [{ model: User, attributes: ['name'] }] }, { model: Batch, required: false, include: [{ model: Course, attributes: ['title'], required: false }] }] },
+          { model: Account, required: false, attributes: ['name', 'sub_type'] }
+        ],
+        order: [['paid_at', 'DESC']]
+      }),
+      Expense.findAll({
+        where: expWhere,
+        include: [{ model: Account, required: false, attributes: ['name'] }],
+        order: [['date', 'DESC']]
+      })
+    ]);
 
-    const inflows = await JournalLine.sum('debit', { where: { account_id: { [Op.in]: cashIds } } }) || 0;
-    const outflows = await JournalLine.sum('credit', { where: { account_id: { [Op.in]: cashIds } } }) || 0;
+    const inflowRows = transactions.map(tx => ({
+      id: tx.id,
+      date: tx.paid_at,
+      type: 'inflow',
+      receipt_no: tx.receipt_no,
+      amount: Number(tx.amount || 0),
+      method: tx.method,
+      category: buildSourceLabel(tx),
+      description: tx.Enrollment?.Student?.User?.name
+        ? `${tx.Enrollment.Student.User.name} · ${tx.Enrollment?.Batch?.Course?.title || 'Fee'}`
+        : buildSourceLabel(tx),
+      account: tx.Account?.name || 'Unmapped'
+    }));
 
-    res.json({ inflows, outflows, net: inflows - outflows });
+    const outflowRows = expenses.map(exp => ({
+      id: exp.id,
+      date: exp.date,
+      type: 'outflow',
+      receipt_no: exp.voucher_no || `EXP-${exp.id}`,
+      amount: Number(exp.amount || 0),
+      method: exp.payment_method || 'cash',
+      category: exp.category || exp.Account?.name || 'Expense',
+      description: exp.description || exp.category || 'Operational Expense',
+      account: exp.Account?.name || 'Unknown'
+    }));
+
+    const totalInflows = inflowRows.reduce((s, r) => s + r.amount, 0);
+    const totalOutflows = outflowRows.reduce((s, r) => s + r.amount, 0);
+
+    // Group by category
+    const inflowByCategory = Object.values(inflowRows.reduce((map, r) => {
+      if (!map[r.category]) map[r.category] = { category: r.category, total: 0, count: 0 };
+      map[r.category].total += r.amount; map[r.category].count++;
+      return map;
+    }, {})).sort((a, b) => b.total - a.total);
+
+    const outflowByCategory = Object.values(outflowRows.reduce((map, r) => {
+      if (!map[r.category]) map[r.category] = { category: r.category, total: 0, count: 0 };
+      map[r.category].total += r.amount; map[r.category].count++;
+      return map;
+    }, {})).sort((a, b) => b.total - a.total);
+
+    // Group by method
+    const inflowByMethod = Object.values(inflowRows.reduce((map, r) => {
+      const m = (r.method || 'cash').toUpperCase();
+      if (!map[m]) map[m] = { method: m, total: 0, count: 0 };
+      map[m].total += r.amount; map[m].count++;
+      return map;
+    }, {})).sort((a, b) => b.total - a.total);
+
+    // Daily net
+    const dailyMap = {};
+    inflowRows.forEach(r => { const d = new Date(r.date).toISOString().split('T')[0]; dailyMap[d] = (dailyMap[d] || 0) + r.amount; });
+    outflowRows.forEach(r => { const d = new Date(r.date).toISOString().split('T')[0]; dailyMap[d] = (dailyMap[d] || 0) - r.amount; });
+    const dailyNet = Object.entries(dailyMap).map(([date, net]) => ({ date, net })).sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      inflows: totalInflows,
+      outflows: totalOutflows,
+      net: totalInflows - totalOutflows,
+      inflowRows,
+      outflowRows,
+      inflowByCategory,
+      outflowByCategory,
+      inflowByMethod,
+      dailyNet,
+      inflowCount: inflowRows.length,
+      outflowCount: outflowRows.length
+    });
   } catch (error) {
+    console.error('[CashFlow Error]', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -209,13 +321,16 @@ exports.getStudentIncome = async (req, res) => {
 // ── NEW: Liquid Accounts (Bank, Cash, MFS) ──
 exports.getLiquidAccounts = async (req, res) => {
   try {
-    const targetBranch = req.branchId || 1;
-    // Liquid accounts are 'asset' type, typically code starting with '10'
+    const targetBranch = getBranchId(req) || req.branchId || 1;
     const accounts = await Account.findAll({
       where: {
         branch_id: targetBranch,
         type: 'asset',
-        code: { [Op.like]: '10%' }
+        is_active: true,
+        [Op.or]: [
+          { code: { [Op.like]: '10%' } },
+          { sub_type: { [Op.in]: ['cash', 'bank', 'mfs'] } }
+        ]
       },
       order: [['code', 'ASC']]
     });
@@ -224,13 +339,27 @@ exports.getLiquidAccounts = async (req, res) => {
     for (const acc of accounts) {
       const debitTotal = await JournalLine.sum('debit', { where: { account_id: acc.id } }) || 0;
       const creditTotal = await JournalLine.sum('credit', { where: { account_id: acc.id } }) || 0;
+      const movementRows = await LiquidityMovement.findAll({
+        where: { branch_id: targetBranch, account_id: acc.id },
+        attributes: ['direction', 'amount', 'transaction_type', 'variance_amount']
+      });
+      const movementNet = movementRows.reduce((sum, row) => {
+        const amount = Number(row.amount || 0);
+        let net = sum;
+        if (row.direction === 'inflow') net += amount;
+        if (row.direction === 'outflow') net -= amount;
+        if (row.transaction_type === 'closing_submission') {
+            net += Number(row.variance_amount || 0);
+        }
+        return net;
+      }, 0);
       
       detailedAccounts.push({
         id: acc.id,
         code: acc.code,
         name: acc.name,
         sub_type: acc.sub_type || 'cash',
-        balance: debitTotal - creditTotal
+        balance: (debitTotal - creditTotal) + movementNet
       });
     }
 
@@ -243,7 +372,7 @@ exports.getLiquidAccounts = async (req, res) => {
 exports.createLiquidAccount = async (req, res) => {
   try {
     const { name, sub_type } = req.body;
-    const targetBranch = req.branchId || 1;
+    const targetBranch = getBranchId(req) || req.branchId || 1;
     
     // Find highest existing code starting with '10'
     const existingAccounts = await Account.findAll({
@@ -274,6 +403,278 @@ exports.createLiquidAccount = async (req, res) => {
     res.status(201).json(newAccount);
   } catch (error) {
     console.error('Account Creation Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getReportSuite = async (req, res) => {
+  try {
+    const branchId = getBranchId(req);
+    const { from, to } = req.query;
+    const transactionDateFilter = createDateRangeFilter(from, to);
+    const expenseDateFilter = createDateRangeFilter(from, to);
+    const journalDateFilter = createDateRangeFilter(from, to);
+    const premiumDateFilter = createDateRangeFilter(from, to);
+    const dueDateFilter = createDateRangeFilter(from, to);
+
+    const transactionWhere = { branch_id: branchId, status: 'success' };
+    if (transactionDateFilter) transactionWhere.paid_at = transactionDateFilter;
+
+    const expenseWhere = { branch_id: branchId, status: { [Op.in]: ['approved', 'verified', 'pending', 'rejected'] } };
+    if (expenseDateFilter) expenseWhere.date = expenseDateFilter;
+
+    const premiumWhere = { branch_id: branchId, plan_type: 'premium' };
+    if (premiumDateFilter) premiumWhere.premium_start_date = premiumDateFilter;
+
+    const invoiceWhere = { branch_id: branchId };
+    if (dueDateFilter) invoiceWhere.due_date = dueDateFilter;
+
+    const [transactions, expenses, premiumStudents, liquidAccounts, invoices] = await Promise.all([
+      Transaction.findAll({
+        where: transactionWhere,
+        include: [
+          {
+            model: Enrollment,
+            required: false,
+            include: [
+              {
+                model: Student,
+                required: false,
+                include: [{ model: User, attributes: ['name', 'email'] }]
+              },
+              {
+                model: Batch,
+                required: false,
+                include: [{ model: Course, attributes: ['title'], required: false }]
+              }
+            ]
+          },
+          { model: Account, required: false, attributes: ['id', 'name', 'code'] }
+        ],
+        order: [['paid_at', 'DESC']]
+      }),
+      Expense.findAll({
+        where: expenseWhere,
+        include: [{ model: Account, required: false, attributes: ['id', 'name', 'code'] }],
+        order: [['date', 'DESC']]
+      }),
+      Student.findAll({
+        where: premiumWhere,
+        include: [
+          { model: User, attributes: ['name', 'email'] },
+          { model: Batch, required: false, include: [{ model: Course, attributes: ['title'], required: false }] }
+        ],
+        order: [['premium_start_date', 'DESC']]
+      }),
+      Account.findAll({
+        where: { branch_id: branchId, type: 'asset', code: { [Op.like]: '10%' }, is_active: true },
+        attributes: ['id', 'name', 'code', 'sub_type'],
+        order: [['code', 'ASC']]
+      }),
+      Invoice.findAll({
+        where: invoiceWhere,
+        include: [
+          {
+            model: Student,
+            required: false,
+            include: [{ model: User, attributes: ['name', 'email'] }, { model: Batch, required: false, include: [{ model: Course, attributes: ['title'], required: false }] }]
+          },
+          {
+            model: Enrollment,
+            required: false,
+            include: [{ model: Batch, required: false, include: [{ model: Course, attributes: ['title'], required: false }] }]
+          }
+        ],
+        order: [['due_date', 'DESC']]
+      })
+    ]);
+
+    const liquidAccountIds = liquidAccounts.map((account) => account.id);
+    const journalEntryWhere = { branch_id: branchId };
+    if (journalDateFilter) journalEntryWhere.date = journalDateFilter;
+
+    const bankStatementLines = liquidAccountIds.length > 0 ? await JournalLine.findAll({
+      where: { account_id: { [Op.in]: liquidAccountIds } },
+      include: [
+        { model: Account, attributes: ['name', 'code', 'sub_type'] },
+        { model: JournalEntry, where: journalEntryWhere, attributes: ['date', 'ref_no', 'description'] }
+      ],
+      order: [[JournalEntry, 'date', 'DESC'], ['id', 'DESC']]
+    }) : [];
+
+    const accountNameById = new Map(liquidAccounts.map((account) => [account.id, account]));
+    const incomeRows = transactions.map((transaction) => {
+      const enrollment = transaction.Enrollment;
+      const student = enrollment?.Student;
+      const batch = enrollment?.Batch || student?.Batch;
+      return {
+        id: transaction.id,
+        date: transaction.paid_at,
+        receipt_no: transaction.receipt_no,
+        transaction_ref: transaction.transaction_ref,
+        amount: Number(transaction.amount || 0),
+        method: transaction.method,
+        source: buildSourceLabel(transaction),
+        source_label: buildSourceLabel(transaction),
+        source_key: transaction.source || 'pos_fee',
+        student_name: student?.User?.name || 'Walk-in / Manual',
+        student_email: student?.User?.email || '',
+        batch_name: batch?.code || batch?.name || 'N/A',
+        course_name: batch?.Course?.title || 'N/A',
+        account_name: transaction.Account?.name || 'Unmapped',
+        description: student?.User?.name
+          ? `${student.User.name} · ${batch?.Course?.title || 'General Income'}`
+          : buildSourceLabel(transaction)
+      };
+    });
+
+    const totalIncome = incomeRows.reduce((sum, row) => sum + row.amount, 0);
+    const incomeSources = Array.from(incomeRows.reduce((map, row) => {
+      const current = map.get(row.source) || { source: row.source, total: 0, count: 0 };
+      current.total += row.amount;
+      current.count += 1;
+      map.set(row.source, current);
+      return map;
+    }, new Map()).values()).sort((a, b) => b.total - a.total);
+
+    const expenseRows = expenses.map((expense) => ({
+      id: expense.id,
+      date: expense.date,
+      category: expense.category || expense.Account?.name || 'Uncategorized',
+      description: expense.description,
+      amount: Number(expense.amount || 0),
+      status: expense.status,
+      payment_method: expense.payment_method,
+      account_name: expense.Account?.name || 'Unknown'
+    }));
+    const totalExpense = expenseRows.reduce((sum, row) => sum + row.amount, 0);
+    const expenseByCategory = Array.from(expenseRows.reduce((map, row) => {
+      const current = map.get(row.category) || { category: row.category, total: 0, count: 0 };
+      current.total += row.amount;
+      current.count += 1;
+      map.set(row.category, current);
+      return map;
+    }, new Map()).values()).sort((a, b) => b.total - a.total);
+
+    const premiumSubscriptions = premiumStudents.map((student) => ({
+      student_id: student.id,
+      student_name: student.User?.name || 'Unknown',
+      student_email: student.User?.email || '',
+      batch_name: student.Batch?.code || student.Batch?.name || 'N/A',
+      course_name: student.Batch?.Course?.title || 'N/A',
+      start_date: student.premium_start_date,
+      expiry_date: student.premium_expiry_date,
+      amount: PREMIUM_PLAN_PRICE,
+      source: 'PTE Premium Subscription'
+    }));
+
+    const receivableRows = invoices
+      .map((invoice) => {
+        const student = invoice.Student;
+        const batch = student?.Batch || invoice.Enrollment?.Batch;
+        const due = Math.max(Number(invoice.amount || 0) - Number(invoice.paid || 0), 0);
+        return {
+          invoice_id: invoice.id,
+          invoice_no: invoice.invoice_no,
+          invoice_number: invoice.invoice_no,
+          due_date: invoice.due_date,
+          student_name: student?.User?.name || 'Unknown',
+          batch_name: batch?.code || batch?.name || 'N/A',
+          course_name: batch?.Course?.title || 'N/A',
+          amount: Number(invoice.amount || 0),
+          paid: Number(invoice.paid || 0),
+          due,
+          status: invoice.status
+        };
+      })
+      .filter((invoice) => invoice.due > 0)
+      .sort((a, b) => b.due - a.due);
+
+    const bankStatement = bankStatementLines.map((line) => ({
+      id: line.id,
+      date: line.JournalEntry?.date,
+      reference: line.JournalEntry?.ref_no,
+      description: line.JournalEntry?.description,
+      account_name: line.Account?.name || accountNameById.get(line.account_id)?.name || 'Account',
+      account_code: line.Account?.code || accountNameById.get(line.account_id)?.code || '',
+      debit: Number(line.debit || 0),
+      credit: Number(line.credit || 0),
+      amount: Math.max(Number(line.debit || 0), Number(line.credit || 0)),
+      entry_type: Number(line.debit || 0) > 0 ? 'inflow' : 'outflow',
+      balance_effect: Number(line.debit || 0) - Number(line.credit || 0)
+    }));
+
+    const trialBalanceAccounts = await Account.findAll({
+      where: { branch_id: branchId, is_active: true },
+      order: [['code', 'ASC']]
+    });
+    const trialBalance = [];
+    let totalDebits = 0;
+    let totalCredits = 0;
+    for (const account of trialBalanceAccounts) {
+      const lineWhere = { account_id: account.id };
+      const entryInclude = journalDateFilter ? [{ model: JournalEntry, where: journalEntryWhere, attributes: [] }] : [];
+      const debit = await JournalLine.sum('debit', { where: lineWhere, include: entryInclude }) || 0;
+      const credit = await JournalLine.sum('credit', { where: lineWhere, include: entryInclude }) || 0;
+      if (debit || credit) {
+        totalDebits += Number(debit);
+        totalCredits += Number(credit);
+        trialBalance.push({
+          account_name: account.name,
+          account_code: account.code,
+          type: account.type,
+          debit: Number(debit),
+          credit: Number(credit),
+          balance: Number(debit) - Number(credit)
+        });
+      }
+    }
+
+    const summary = {
+      total_income: totalIncome,
+      total_expense: totalExpense,
+      net_profit: totalIncome - totalExpense,
+      total_receivables: receivableRows.reduce((sum, row) => sum + row.due, 0),
+      premium_revenue_estimate: premiumSubscriptions.reduce((sum, row) => sum + row.amount, 0),
+      income_transactions: incomeRows.length,
+      expense_transactions: expenseRows.length,
+      premium_subscriptions: premiumSubscriptions.length
+    };
+
+    res.json({
+      range: { from: from || null, to: to || null },
+      summary,
+      income: {
+        total: totalIncome,
+        by_source: incomeSources,
+        rows: incomeRows
+      },
+      expenses: {
+        total: totalExpense,
+        by_category: expenseByCategory,
+        rows: expenseRows
+      },
+      premium: {
+        total: premiumSubscriptions.reduce((sum, row) => sum + row.amount, 0),
+        rows: premiumSubscriptions
+      },
+      receivables: {
+        total_due: receivableRows.reduce((sum, row) => sum + row.due, 0),
+        rows: receivableRows
+      },
+      bank_statement: {
+        rows: bankStatement,
+        liquid_accounts: liquidAccounts.map((account) => ({ id: account.id, name: account.name, code: account.code, sub_type: account.sub_type || 'cash' }))
+      },
+      trial_balance: {
+        rows: trialBalance,
+        total_debits: totalDebits,
+        total_credits: totalCredits,
+        difference: totalDebits - totalCredits
+      }
+    });
+  } catch (error) {
+    console.error('[Finance Report Suite Error]:', error);
     res.status(500).json({ error: error.message });
   }
 };

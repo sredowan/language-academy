@@ -1,71 +1,123 @@
-import Link from 'next/link';
-import { ArrowRight, Calendar, User } from 'lucide-react';
+import Link from "next/link";
+import { ArrowRight, Calendar, Clock, User } from "lucide-react";
 
 export const metadata = {
-  title: "Blog | Language Academy",
-  description: "Read the latest tips, tricks, and success stories for PTE and IELTS.",
+  title: "Blog & Resources | Language Academy",
+  description: "Expert tips, strategies, and success stories for PTE, IELTS, and English language preparation.",
 };
 
 async function getBlogs() {
   try {
-    const res = await fetch('http://localhost:5000/api/public/blog', { next: { revalidate: 60 } });
+    const res = await fetch("http://localhost:3000/api/public/blog", { next: { revalidate: 60 } });
     if (!res.ok) return [];
     return res.json();
   } catch (error) {
-    console.error('Error fetching blogs:', error);
+    console.error("Error fetching blogs:", error);
     return [];
   }
 }
 
 export default async function BlogListingPage() {
   const blogs = await getBlogs();
+  const featured = blogs[0] || null;
+  const remaining = blogs.slice(1);
 
   return (
-    <div className="pt-32 pb-24 min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">
-            Language Academy <span className="text-primary">Blog</span>
-          </h1>
-          <p className="text-lg text-slate-600">
-            Insights, strategies, and updates to help you ace your English proficiency exams.
-          </p>
-        </div>
-
-        {blogs.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-slate-100">
-            <h3 className="text-lg font-medium text-slate-900">No articles published yet</h3>
-            <p className="text-slate-500">Check back soon for expert tips and tricks.</p>
+    <div className="pb-24">
+      {/* Hero */}
+      <section className="pb-12 pt-6 md:pb-16 md:pt-8">
+        <div className="container-shell">
+          <div className="gradient-hero fine-grid overflow-hidden rounded-[36px] px-8 py-12 text-white md:px-12 md:py-16 text-center">
+            <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/85">Blog & Resources</span>
+            <h1 className="mx-auto mt-5 max-w-3xl text-4xl font-extrabold leading-tight md:text-6xl">
+              Insights, Strategies & Expert Guidance
+            </h1>
+            <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-slate-200">
+              Tips, techniques, and updates from our academic team to help you prepare smarter and score higher.
+            </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {blogs.map((blog) => (
-              <div key={blog.id} className="bg-white rounded-[2rem] overflow-hidden shadow-sm hover:shadow-xl transition-all border border-slate-100 flex flex-col h-full group">
-                <div className="aspect-[16/9] bg-slate-200 relative overflow-hidden shrink-0">
-                  <img src={blog.image_url || '/pte_course_thumb.png'} alt={blog.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
-                </div>
-                <div className="p-6 md:p-8 flex flex-col flex-1">
-                  <h3 className="text-xl font-bold text-slate-900 mb-3 group-hover:text-primary transition-colors line-clamp-2">
-                    <Link href={`/blog/${blog.slug}`}>{blog.title}</Link>
-                  </h3>
-                  <p className="text-slate-600 mb-6 line-clamp-3 text-sm flex-1">
-                    {blog.excerpt || 'Read this article to discover valuable insights and strategies.'}
-                  </p>
-                  
-                  <div className="flex items-center justify-between text-xs text-slate-500 font-medium pt-6 border-t border-slate-100 shrink-0">
-                    <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date(blog.published_at || new Date()).toLocaleDateString()}</span>
-                    <Link href={`/blog/${blog.slug}`} className="text-primary hover:text-primary/80 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                      Read More <ArrowRight size={14} />
-                    </Link>
+        </div>
+      </section>
+
+      <section>
+        <div className="container-shell">
+          {blogs.length === 0 ? (
+            <div className="premium-panel px-8 py-20 text-center">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary mb-6">
+                <Clock size={32} />
+              </div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-3">Expert insights coming soon</h3>
+              <p className="text-slate-500 mb-8 max-w-md mx-auto">Our editorial team is preparing valuable PTE, IELTS, and language learning strategies. Check back soon!</p>
+              <Link href="/courses" className="primary-btn">Explore Courses Instead</Link>
+            </div>
+          ) : (
+            <>
+              {/* Featured Post */}
+              {featured && (
+                <div className="premium-panel overflow-hidden mb-10">
+                  <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
+                    <div className="aspect-[16/10] lg:aspect-auto relative overflow-hidden">
+                      <img src={featured.image_url || "/hero_banner.png"} alt={featured.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent lg:bg-gradient-to-r" />
+                    </div>
+                    <div className="p-8 md:p-10 flex flex-col justify-center">
+                      <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent w-fit mb-4">Featured</span>
+                      <h2 className="text-2xl font-extrabold text-slate-900 md:text-3xl line-clamp-2">
+                        <Link href={`/blog/${featured.slug}`} className="hover:text-primary transition">{featured.title}</Link>
+                      </h2>
+                      <p className="mt-4 text-base leading-8 text-slate-600 line-clamp-3">{featured.excerpt || "Read this article to discover valuable insights and strategies."}</p>
+                      <div className="mt-6 flex items-center gap-5 text-sm text-slate-500">
+                        <span className="flex items-center gap-1.5"><Calendar size={14} />{new Date(featured.published_at || new Date()).toLocaleDateString()}</span>
+                        <span className="flex items-center gap-1.5"><Clock size={14} />5 min read</span>
+                      </div>
+                      <Link href={`/blog/${featured.slug}`} className="primary-btn mt-8 w-fit">Read Article <ArrowRight size={16} /></Link>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
 
-      </div>
+              {/* Remaining Posts Grid */}
+              {remaining.length > 0 && (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {remaining.map((blog) => (
+                    <div key={blog.id} className="premium-panel overflow-hidden flex flex-col h-full group">
+                      <div className="aspect-[16/9] relative overflow-hidden">
+                        <img src={blog.image_url || "/hero_banner.png"} alt={blog.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                      </div>
+                      <div className="p-6 md:p-7 flex flex-col flex-1">
+                        <h3 className="text-lg font-bold text-slate-900 mb-3 group-hover:text-primary transition line-clamp-2">
+                          <Link href={`/blog/${blog.slug}`}>{blog.title}</Link>
+                        </h3>
+                        <p className="text-sm text-slate-600 mb-5 line-clamp-3 flex-1">{blog.excerpt || "Read this article to discover valuable insights."}</p>
+                        <div className="flex items-center justify-between text-xs text-slate-500 font-medium pt-5 border-t border-slate-100">
+                          <span className="flex items-center gap-1.5"><Calendar size={13} />{new Date(blog.published_at || new Date()).toLocaleDateString()}</span>
+                          <Link href={`/blog/${blog.slug}`} className="text-primary hover:text-primary/80 flex items-center gap-1 transition group-hover:translate-x-1">
+                            Read More <ArrowRight size={13} />
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="section-space">
+        <div className="container-shell">
+          <div className="overflow-hidden rounded-[36px] bg-slate-950 px-8 py-12 text-white text-center md:px-14 md:py-16">
+            <h2 className="text-3xl font-extrabold md:text-4xl">Want personalized guidance?</h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-slate-300">Our academic advisors can answer all your questions and help you create a study plan tailored to your goals.</p>
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <Link href="/contact" className="accent-btn text-base px-8 py-4">Book Free Consultation <ArrowRight size={18} /></Link>
+              <Link href="/courses" className="secondary-btn border-white/20 bg-white/10 text-white hover:border-white text-base px-8 py-4">Browse Courses</Link>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

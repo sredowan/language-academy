@@ -20,9 +20,9 @@ export default function SuccessPage({ searchParams }) {
           </div>
           
           <h1 className="text-2xl font-extrabold text-slate-900 mb-2">Welcome to the Academy!</h1>
-          <p className="text-slate-500 mb-6">
-            Your enrollment was successful. We've sent a confirmation and your login credentials to your email address.
-          </p>
+            <p className="text-slate-500 mb-6">
+             Your enrollment was successful. We&apos;ve sent a confirmation and your login credentials to your email address.
+           </p>
 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-8 text-left">
             <div className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Transaction ID</div>

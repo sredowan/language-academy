@@ -41,7 +41,7 @@ const QuestionBank = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black">Question Bank</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">Browse and practice from our library of {tasks.length} tasks.</p>
+          <p className="text-[var(--text-dim)] mt-1 font-medium">Browse and practice from our library of {tasks.length} tasks.</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -52,10 +52,10 @@ const QuestionBank = () => {
               placeholder="Search tasks..."
               value={filter.search}
               onChange={(e) => setFilter({...filter, search: e.target.value})}
-              className="pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none w-full md:w-64 transition-all"
+              className="pl-10 pr-4 py-2.5 glass-morphism border border-gray-200 border-[var(--border)] rounded-xl text-sm focus:ring-2 focus:ring-indigo-600 outline-none w-full md:w-64 transition-all"
             />
           </div>
-          <button className="p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <button className="p-2.5 glass-morphism border border-gray-200 border-[var(--border)] rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
             <Filter className="w-5 h-5 text-gray-500" />
           </button>
         </div>
@@ -69,8 +69,8 @@ const QuestionBank = () => {
             onClick={() => setFilter({...filter, section: sec})}
             className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
               filter.section === sec 
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' 
-              : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700'
+              ? 'bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white shadow-lg shadow-indigo-500/30' 
+              : 'glass-morphism text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 border border-[var(--border)] border-[var(--border)]'
             }`}
           >
             {sec}
@@ -79,11 +79,11 @@ const QuestionBank = () => {
       </div>
 
       {/* Task List */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl overflow-hidden border border-gray-100 dark:border-gray-700 shadow-sm">
+      <div className="glass-morphism rounded-3xl overflow-hidden border border-[var(--border)] border-[var(--border)] shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
+              <tr className="border-b border-[var(--border)] border-[var(--border)] bg-gray-50/50 ">
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Section</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Task Type</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Target</th>
@@ -95,7 +95,7 @@ const QuestionBank = () => {
               {loading ? (
                 [1,2,3,4,5].map(i => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan="5" className="px-6 py-8 h-12 bg-gray-50/20 dark:bg-gray-800/20"></td>
+                    <td colSpan="5" className="px-6 py-8 h-12 bg-gray-50/20 glass-morphism/20"></td>
                   </tr>
                 ))
               ) : filteredTasks.map((task) => {
@@ -120,7 +120,7 @@ const QuestionBank = () => {
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-gray-900 dark:text-white">{task.type}</span>
+                        <span className="text-sm font-bold text-[var(--text-main)]">{task.type}</span>
                         {isTaskPremium && <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />}
                       </div>
                     </td>
@@ -134,11 +134,11 @@ const QuestionBank = () => {
                     </td>
                     <td className="px-6 py-5 text-right">
                       {locked ? (
-                        <div className="flex items-center justify-end gap-2 text-indigo-600 font-black text-[10px] uppercase">
+                        <div className="flex items-center justify-end gap-2 text-[var(--primary)] font-black text-[10px] uppercase">
                           <Lock className="w-3 h-3" /> Upgrade
                         </div>
                       ) : (
-                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all ml-auto" />
+                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all ml-auto" />
                       )}
                     </td>
                   </tr>

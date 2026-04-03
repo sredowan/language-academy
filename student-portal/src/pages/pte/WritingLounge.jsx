@@ -82,7 +82,7 @@ const WritingLounge = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (loading || !task) return <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-600" /></div>;
+  if (loading || !task) return <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-[var(--primary)]" /></div>;
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
@@ -97,12 +97,12 @@ const WritingLounge = () => {
           </div>
         </div>
         <div className="flex items-center gap-4">
-           <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm font-black">
-              <Clock className="w-4 h-4 text-indigo-600" />
+           <div className="flex items-center gap-2 px-4 py-2 glass-morphism rounded-xl border border-[var(--border)] border-[var(--border)] shadow-sm font-black">
+              <Clock className="w-4 h-4 text-[var(--primary)]" />
               <span className={timer < 60 ? 'text-red-600' : ''}>{formatTime(timer)}</span>
            </div>
-           <div className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm font-black text-sm">
-              Words: <span className="text-indigo-600">{wordCount}</span>
+           <div className="px-4 py-2 glass-morphism rounded-xl border border-[var(--border)] border-[var(--border)] shadow-sm font-black text-sm">
+              Words: <span className="text-[var(--primary)]">{wordCount}</span>
            </div>
         </div>
       </div>
@@ -111,7 +111,7 @@ const WritingLounge = () => {
         
         {/* Prompt Card */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="glass-morphism rounded-3xl p-6 border border-[var(--border)] border-[var(--border)] shadow-sm">
              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                <Info className="w-4 h-4" /> Instructions
              </h3>
@@ -120,8 +120,8 @@ const WritingLounge = () => {
              </p>
           </div>
 
-          <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-3xl p-6 border border-indigo-100 dark:border-indigo-800/40">
-             <h3 className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <div className="bg-[var(--glass)] dark:bg-indigo-900/20 rounded-3xl p-6 border border-indigo-100 dark:border-indigo-800/40">
+             <h3 className="text-xs font-black text-[var(--primary)] dark:text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                <Sparkles className="w-4 h-4" /> PTE Strategy
              </h3>
              <ul className="space-y-3">
@@ -141,24 +141,24 @@ const WritingLounge = () => {
 
         {/* Editor Shell */}
         <div className="lg:col-span-2 space-y-6">
-           <div className="bg-white dark:bg-gray-800 rounded-3xl p-4 border border-gray-100 dark:border-gray-700 shadow-sm min-h-[500px] flex flex-col">
-              <div className="mb-4 p-6 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-800 max-h-64 overflow-y-auto italic font-medium text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
+           <div className="glass-morphism rounded-3xl p-4 border border-[var(--border)] border-[var(--border)] shadow-sm min-h-[500px] flex flex-col">
+              <div className="mb-4 p-6 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-[var(--border)] dark:border-gray-800 max-h-64 overflow-y-auto italic font-medium text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
                  {task.content?.prompt || "Source passage text would appear here..."}
               </div>
               
               <textarea 
-                className="flex-1 w-full bg-transparent p-6 outline-none text-gray-900 dark:text-white font-medium text-base resize-none"
+                className="flex-1 w-full bg-transparent p-6 outline-none text-[var(--text-main)] font-medium text-base resize-none"
                 placeholder="Start writing your answer here..."
                 value={response}
                 onChange={(e) => setResponse(e.target.value)}
                 disabled={status !== 'writing'}
               />
 
-              <div className="pt-4 border-t border-gray-50 dark:border-gray-700 flex justify-end">
+              <div className="pt-4 border-t border-gray-50 border-[var(--border)] flex justify-end">
                  <button 
                    onClick={handleSubmit}
                    disabled={status !== 'writing' || !response.trim()}
-                   className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50"
+                   className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50"
                  >
                    {status === 'submitting' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                    {status === 'submitting' ? 'Analyzing...' : 'Submit Essay'}
@@ -168,22 +168,22 @@ const WritingLounge = () => {
 
            {/* Results Overlay/Card */}
            {result && (
-             <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border-2 border-emerald-500/20 shadow-2xl animate-in zoom-in duration-300">
+             <div className="glass-morphism rounded-3xl p-8 border-2 border-emerald-500/20 shadow-2xl animate-in zoom-in duration-300">
                 <div className="flex items-center justify-between mb-8">
                   <h3 className="text-2xl font-black">AI Grade Report</h3>
-                  <div className="bg-indigo-600 text-white px-6 py-2 rounded-2xl font-black text-xl">
+                  <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white px-6 py-2 rounded-2xl font-black text-xl">
                     {result.score}<span className="text-xs opacity-60">/90</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                    {[
-                     { label: 'Grammar', value: isPremium ? '90/90' : 'Upgrade', color: 'text-indigo-600' },
-                     { label: 'Spelling', value: isPremium ? '100%' : 'Upgrade', color: 'text-blue-600' },
+                     { label: 'Grammar', value: isPremium ? '90/90' : 'Upgrade', color: 'text-[var(--primary)]' },
+                     { label: 'Spelling', value: isPremium ? '100%' : 'Upgrade', color: 'text-[var(--accent)]' },
                      { label: 'Form', value: '2/2', color: 'text-emerald-600' },
                      { label: 'Structure', value: isPremium ? 'Excellent' : 'Locked', color: 'text-purple-600' },
                    ].map((m, i) => (
-                     <div key={i} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl text-center border border-gray-100 dark:border-gray-800">
+                     <div key={i} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl text-center border border-[var(--border)] dark:border-gray-800">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{m.label}</p>
                         <p className={`text-sm font-black ${m.color}`}>{m.value}</p>
                      </div>
@@ -192,7 +192,7 @@ const WritingLounge = () => {
 
                 <div className="space-y-4">
                   <h4 className="font-bold flex items-center gap-2">
-                     <AlertCircle className="w-4 h-4 text-indigo-600" /> Actionable Feedback
+                     <AlertCircle className="w-4 h-4 text-[var(--primary)]" /> Actionable Feedback
                   </h4>
                   <div className="p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl text-sm leading-relaxed">
                      {isPremium ? 
@@ -206,7 +206,7 @@ const WritingLounge = () => {
                       Back to Hub
                    </button>
                    {!isPremium && (
-                      <button onClick={() => navigate('/subscription')} className="flex-1 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg text-sm">
+                      <button onClick={() => navigate('/subscription')} className="flex-1 py-4 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg text-sm">
                         Unlock AI Analysis
                       </button>
                    )}

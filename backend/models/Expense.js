@@ -54,11 +54,21 @@ const Expense = sequelize.define('Expense', {
     type: DataTypes.DATE,
   },
   status: {
-    type: DataTypes.ENUM('pending', 'verified', 'approved', 'rejected'),
+    type: DataTypes.ENUM('pending', 'verified', 'approved', 'rejected', 'deleted'),
     defaultValue: 'pending',
   },
   rejection_reason: {
     type: DataTypes.TEXT,
+  },
+  deletion_reason: {
+    type: DataTypes.TEXT,
+  },
+  deleted_by: {
+    type: DataTypes.INTEGER,
+    references: { model: User, key: 'id' },
+  },
+  deleted_at: {
+    type: DataTypes.DATE,
   },
 }, {
   tableName: 'expenses',
@@ -69,5 +79,6 @@ Expense.belongsTo(Branch, { foreignKey: 'branch_id' });
 Expense.belongsTo(Account, { foreignKey: 'account_id' });
 Expense.belongsTo(User, { as: 'Approver', foreignKey: 'approved_by' });
 Expense.belongsTo(User, { as: 'Verifier', foreignKey: 'verified_by' });
+Expense.belongsTo(User, { as: 'Deleter', foreignKey: 'deleted_by' });
 
 module.exports = Expense;

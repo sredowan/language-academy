@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "title": "PTE Academic Standard",
+    "slug": null,
+    "is_published": true,
+    "status": "active"
+  },
+  {
+    "id": 2,
+    "title": "IELTS Academic Masterclass",
+    "slug": null,
+    "is_published": true,
+    "status": "active"
+  }
+]

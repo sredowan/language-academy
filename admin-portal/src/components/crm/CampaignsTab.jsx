@@ -5,7 +5,7 @@ import { inputStyle } from './CRMComponents';
 
 const CampaignsTab = ({ campaigns, onRefresh }) => {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', channel: 'email', subject: '', body: '', target_audience: 'all_leads' });
+  const [form, setForm] = useState({ name: '', channel: 'email', subject: '', body: '', target_audience: 'all_leads', attachment_url: '' });
   const [saving, setSaving] = useState(false);
 
   const handleCreate = async (e) => {
@@ -46,8 +46,23 @@ const CampaignsTab = ({ campaigns, onRefresh }) => {
               </select>
             </div>
             {form.channel === 'email' && <input placeholder="Email Subject" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} style={inputStyle} />}
-            <textarea required placeholder="Message body..." value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} style={{ ...inputStyle, height: '90px', resize: 'none' }} />
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            {form.channel === 'email' && <input placeholder="Attachment URL (Optional)" value={form.attachment_url || ''} onChange={e => setForm(f => ({ ...f, attachment_url: e.target.value }))} style={inputStyle} title="Link to a PDF or Image" />}
+            
+            <div style={{ position: 'relative' }}>
+              <textarea required placeholder="Message body..." value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} style={{ ...inputStyle, height: '110px', resize: 'none', width: '100%' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.3rem' }}>
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>
+                  Variables: <strong>{`{{name}}`}</strong>, <strong>{`{{phone}}`}</strong>, <strong>{`{{email}}`}</strong>, <strong>{`{{course}}`}</strong>
+                </span>
+                {form.channel === 'sms' && (
+                  <span style={{ fontSize: '0.65rem', color: form.body.length > 160 ? '#f59e0b' : 'var(--text-dim)', fontWeight: '600' }}>
+                    {form.body.length} chars ({Math.ceil((form.body.length || 1) / 160)} SMS)
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
               <button type="button" onClick={() => setShowForm(false)} style={{ padding: '0.6rem 1.2rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', cursor: 'pointer' }}>Cancel</button>
               <button type="submit" disabled={saving} className="btn-primary" style={{ padding: '0.6rem 1.5rem' }}>{saving ? '...' : 'Save Draft'}</button>
             </div>

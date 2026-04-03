@@ -55,3 +55,8 @@ backend/uploads/
 **/dist/
 **/build/
 **/env
+
+.agent/
+.claude/
+backend/_token.txt
+tmp/

@@ -7,5 +7,7 @@ router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.get('/me', authMiddleware, authController.getMe);
 router.get('/staff', authMiddleware, authController.getStaff);
+router.patch('/role', authMiddleware, authController.updateRole);
+router.patch('/staff-password', authMiddleware, authController.setStaffPassword);
 
 module.exports = router;

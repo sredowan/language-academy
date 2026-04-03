@@ -54,6 +54,10 @@ const Activity = sequelize.define('Activity', {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
+  student_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
   created_by: {
     type: DataTypes.INTEGER,
     allowNull: true,

@@ -2,17 +2,66 @@ const Student = require('../models/Student');
 const User = require('../models/User');
 const Batch = require('../models/Batch');
 const Course = require('../models/Course');
+const Enrollment = require('../models/Enrollment');
+const Invoice = require('../models/Invoice');
+const Activity = require('../models/Activity');
 const bcrypt = require('bcryptjs');
+const sequelize = require('../config/db.config');
+const { Op } = require('sequelize');
 
 const getEffectiveBranchId = (req) => req.scopedBranchId || req.branchId;
 
-const deriveStudentState = (student) => {
+const normalizeEducationDetails = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  }
+  return [];
+};
+
+const normalizeEmploymentDetails = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+  return value;
+};
+
+const normalizePostCourseGoalType = (value) => {
+  if (value !== 'specific_country' && value !== 'another_purpose') return null;
+  return value;
+};
+
+const normalizeEnglishLevel = (value) => {
+  if (!value) return null;
+  const normalized = String(value).trim().toLowerCase();
+  return ['beginner', 'intermediate', 'expert'].includes(normalized) ? normalized : null;
+};
+
+const normalizeNullableText = (value) => {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+};
+
+const OPEN_FEE_STATUSES = ['pending', 'partial', 'overdue'];
+
+const deriveStudentState = (student, feeSummary, rejectedFees = []) => {
   const status = student.status;
   const batchEndDate = student.Batch?.end_date ? new Date(student.Batch.end_date) : null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   if (status === 'dropped') return 'dropped';
+  if (feeSummary && Number(feeSummary.due || 0) > 0 && OPEN_FEE_STATUSES.includes(feeSummary.status)) return 'fees_pending';
+  if (rejectedFees.length > 0) return 'payment_rejected';
   if (!student.batch_id || !student.Batch) return 'unassigned';
 
   if (batchEndDate && !Number.isNaN(batchEndDate.getTime())) {
@@ -23,13 +72,91 @@ const deriveStudentState = (student) => {
   return 'enrolled';
 };
 
-const decorateStudent = (student) => {
-  const derivedState = deriveStudentState(student);
+const buildFeeSummaryMap = async (branchId, studentIds) => {
+  if (!studentIds.length) return new Map();
+
+  const invoices = await Invoice.findAll({
+    where: {
+      branch_id: branchId,
+      student_id: { [Op.in]: studentIds }
+    },
+    attributes: ['id', 'student_id', 'enrollment_id', 'amount', 'paid', 'status', 'due_date', 'invoice_no'],
+    order: [['issued_at', 'DESC']]
+  });
+
+  const summaryMap = new Map();
+  invoices.forEach((invoice) => {
+    const current = summaryMap.get(invoice.student_id);
+    const candidate = {
+      invoice_id: invoice.id,
+      enrollment_id: invoice.enrollment_id,
+      invoice_no: invoice.invoice_no,
+      amount: Number(invoice.amount || 0),
+      paid: Number(invoice.paid || 0),
+      due: Number(invoice.amount || 0) - Number(invoice.paid || 0),
+      status: invoice.status,
+      due_date: invoice.due_date
+    };
+
+    if (!current || (Number(candidate.due || 0) > 0 && OPEN_FEE_STATUSES.includes(candidate.status))) {
+      summaryMap.set(invoice.student_id, candidate);
+    }
+  });
+
+  return summaryMap;
+};
+
+const buildRejectedFeeMap = async (branchId, studentIds) => {
+  if (!studentIds.length) return new Map();
+
+  const invoices = await Invoice.findAll({
+    where: {
+      branch_id: branchId,
+      status: 'rejected'
+    },
+    attributes: ['id', 'student_id', 'enrollment_id', 'invoice_no', 'amount', 'paid', 'status', 'notes', 'updated_at'],
+    include: [
+      {
+        model: Enrollment,
+        attributes: ['student_id'],
+        required: false
+      }
+    ],
+    order: [['updated_at', 'DESC']]
+  });
+
+  const rejectedMap = new Map();
+  invoices.forEach((invoice) => {
+    const resolvedStudentId = invoice.student_id || invoice.Enrollment?.student_id;
+    if (!resolvedStudentId || !studentIds.includes(resolvedStudentId)) return;
+
+    const current = rejectedMap.get(resolvedStudentId) || [];
+    current.push({
+      invoice_id: invoice.id,
+      enrollment_id: invoice.enrollment_id,
+      invoice_no: invoice.invoice_no,
+      amount: Number(invoice.amount || 0),
+      paid: Number(invoice.paid || 0),
+      status: invoice.status,
+      note: invoice.notes,
+      rejected_at: invoice.updated_at
+    });
+    rejectedMap.set(resolvedStudentId, current);
+  });
+
+  return rejectedMap;
+};
+
+const decorateStudent = (student, feeSummary = null, rejectedFees = []) => {
+  const derivedState = deriveStudentState(student, feeSummary, rejectedFees);
   const completionDate = derivedState === 'course_completed' ? student.Batch?.end_date : null;
   return {
     ...student.toJSON(),
     derived_state: derivedState,
+    fee_summary: feeSummary,
+    rejected_fees: rejectedFees,
     is_course_completed: derivedState === 'course_completed',
+    has_success_record: Boolean(student.final_course_result || student.success_destination_country || student.success_recorded_at),
     course_completion_date: completionDate,
     is_premium_pte: student.plan_type === 'premium'
   };
@@ -49,7 +176,10 @@ exports.getAllStudents = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
-    res.json(students.map(decorateStudent));
+    const studentIds = students.map((student) => student.id);
+    const feeSummaryMap = await buildFeeSummaryMap(branchId, studentIds);
+    const rejectedFeeMap = await buildRejectedFeeMap(branchId, studentIds);
+    res.json(students.map((student) => decorateStudent(student, feeSummaryMap.get(student.id) || null, rejectedFeeMap.get(student.id) || [])));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -64,26 +194,42 @@ exports.getStudentById = async (req, res) => {
       where: { id: req.params.id, branch_id: branchId },
       include: [
         { model: User },
-        { model: Batch, include: [{ model: Course, attributes: ['id', 'title'] }] }
+        { model: Batch, include: [{ model: Course, attributes: ['id', 'title', 'duration_weeks'] }] }
       ]
     });
 
     if (!student) return res.status(404).json({ error: 'Student not found' });
-    res.json(decorateStudent(student));
+
+    const feeSummaryMap = await buildFeeSummaryMap(branchId, [student.id]);
+    const rejectedFeeMap = await buildRejectedFeeMap(branchId, [student.id]);
+    res.json(decorateStudent(student, feeSummaryMap.get(student.id) || null, rejectedFeeMap.get(student.id) || []));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
 exports.createStudent = async (req, res) => {
+  const branchId = getEffectiveBranchId(req);
+  if (!branchId) return res.status(400).json({ error: 'Please select a specific branch' });
+
   const t = await sequelize.transaction();
   try {
     const { 
       name, email, password, batch_id, guardian_id, course_id,
       first_name, middle_name, last_name, father_name, mother_name,
-      mobile_no, nid_birth_cert, current_address, permanent_address,
-      passport_no, photograph_url, educational_details, employment_details
+      mobile_no, nid_birth_cert, date_of_birth, religion, nationality,
+      gender, blood_group, marital_status,
+      emergency_contact_name, emergency_contact_relation, emergency_contact_phone,
+      current_address, permanent_address,
+      passport_no, passport_expiry, visa_status,
+      photograph_url, educational_details, employment_details,
+      profession, lead_source,
+      post_course_goal_type, target_country, english_level
     } = req.body;
+
+    const normalizedGoalType = normalizePostCourseGoalType(post_course_goal_type);
+    const normalizedTargetCountry = normalizedGoalType === 'specific_country' ? String(target_country || '').trim() || null : null;
+    const normalizedEnglishLevel = normalizeEnglishLevel(english_level);
     
     // Fallback for name if first_name/last_name provided but not name
     const fullName = name || `${first_name || ''} ${last_name || ''}`.trim() || 'No Name Provided';
@@ -96,20 +242,28 @@ exports.createStudent = async (req, res) => {
       email,
       password: hashedPassword,
       role: 'student',
-      branch_id: req.branchId
+      branch_id: branchId
     }, { transaction: t });
 
     // Create Student record
     const student = await Student.create({
       user_id: user.id,
-      branch_id: req.branchId,
+      branch_id: branchId,
       batch_id: batch_id || null,
       guardian_id: guardian_id || null,
-      first_name, last_name, father_name, mother_name,
-      mobile_no, nid_birth_cert, current_address, permanent_address,
-      passport_no, photograph_url, 
-      educational_details: (typeof educational_details === 'string' && educational_details.trim() !== '') ? JSON.parse(educational_details) : (educational_details || []),
-      employment_details: (typeof employment_details === 'string' && employment_details.trim() !== '') ? JSON.parse(employment_details) : (employment_details || []),
+      first_name, middle_name, last_name, father_name, mother_name,
+      mobile_no, nid_birth_cert, date_of_birth, religion, 
+      nationality: nationality || 'Bangladeshi',
+      gender, blood_group, marital_status,
+      emergency_contact_name, emergency_contact_relation, emergency_contact_phone,
+      current_address, permanent_address,
+      passport_no, passport_expiry, visa_status,
+      photograph_url, profession, lead_source,
+      educational_details: normalizeEducationDetails(educational_details),
+      employment_details: normalizeEmploymentDetails(employment_details),
+      post_course_goal_type: normalizedGoalType,
+      target_country: normalizedTargetCountry,
+      english_level: normalizedEnglishLevel,
       enrollment_date: new Date()
     }, { transaction: t });
 
@@ -117,22 +271,20 @@ exports.createStudent = async (req, res) => {
     let enrollment = null;
 
     if (course_id) {
-      const Enrollment = require('../models/Enrollment');
-      const Invoice = require('../models/Invoice');
-      
       const course = await Course.findByPk(course_id, { transaction: t });
       if (course) {
         enrollment = await Enrollment.create({
-          branch_id: req.branchId,
+          branch_id: branchId,
           student_id: student.id,
           batch_id: batch_id || null,
           total_fee: course.base_fee,
           discount: 0,
-          paid_amount: 0
+          paid_amount: 0,
+          status: 'pending'
         }, { transaction: t });
 
         invoice = await Invoice.create({
-          branch_id: req.branchId,
+          branch_id: branchId,
           invoice_no: `INV-${Date.now()}-${student.id}`,
           enrollment_id: enrollment.id,
           student_id: student.id,
@@ -140,13 +292,33 @@ exports.createStudent = async (req, res) => {
           paid: 0,
           status: 'pending',
           due_date: new Date(new Date().setDate(new Date().getDate() + 7)),
-          notes: `Admission Fee & Tuition for ${course.title}`
+          notes: `Direct student entry for ${course.title}. Pending fee collection via POS.`
         }, { transaction: t });
       }
     }
 
     await t.commit();
-    res.status(201).json({ user, student, enrollment, invoice });
+
+    const createdStudent = await Student.findOne({
+      where: { id: student.id, branch_id: branchId },
+      include: [
+        { model: User },
+        { model: Batch, include: [{ model: Course, attributes: ['id', 'title'] }] }
+      ]
+    });
+
+    const feeSummary = invoice ? {
+      invoice_id: invoice.id,
+      enrollment_id: enrollment?.id || null,
+      invoice_no: invoice.invoice_no,
+      amount: Number(invoice.amount || 0),
+      paid: Number(invoice.paid || 0),
+      due: Number(invoice.amount || 0) - Number(invoice.paid || 0),
+      status: invoice.status,
+      due_date: invoice.due_date
+    } : null;
+
+    res.status(201).json({ user, student: decorateStudent(createdStudent, feeSummary, []), enrollment, invoice });
   } catch (error) {
     await t.rollback();
     console.error('[CreateStudent Error]:', error);
@@ -194,6 +366,142 @@ exports.updateMe = async (req, res) => {
   }
 };
 
+exports.updateStudent = async (req, res) => {
+  try {
+    const branchId = getEffectiveBranchId(req);
+    if (!branchId) return res.status(400).json({ error: 'Please select a specific branch' });
+
+    const student = await Student.findOne({ where: { id: req.params.id, branch_id: branchId } });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const {
+      first_name, last_name, father_name, mother_name,
+      mobile_no, nid_birth_cert, date_of_birth, religion, nationality,
+      gender, blood_group, marital_status,
+      emergency_contact_name, emergency_contact_relation, emergency_contact_phone,
+      current_address, permanent_address,
+      passport_no, passport_expiry, visa_status,
+      educational_details, employment_details, profession, lead_source,
+      post_course_goal_type, target_country, english_level
+    } = req.body;
+
+    if (first_name !== undefined) student.first_name = first_name;
+    if (last_name !== undefined) student.last_name = last_name;
+    if (father_name !== undefined) student.father_name = father_name;
+    if (mother_name !== undefined) student.mother_name = mother_name;
+    if (mobile_no !== undefined) student.mobile_no = mobile_no;
+    if (nid_birth_cert !== undefined) student.nid_birth_cert = nid_birth_cert;
+    if (date_of_birth !== undefined) student.date_of_birth = date_of_birth;
+    if (religion !== undefined) student.religion = religion;
+    if (nationality !== undefined) student.nationality = nationality;
+    if (gender !== undefined) student.gender = gender;
+    if (blood_group !== undefined) student.blood_group = blood_group;
+    if (marital_status !== undefined) student.marital_status = marital_status;
+    if (emergency_contact_name !== undefined) student.emergency_contact_name = emergency_contact_name;
+    if (emergency_contact_relation !== undefined) student.emergency_contact_relation = emergency_contact_relation;
+    if (emergency_contact_phone !== undefined) student.emergency_contact_phone = emergency_contact_phone;
+    if (current_address !== undefined) student.current_address = current_address;
+    if (permanent_address !== undefined) student.permanent_address = permanent_address;
+    if (passport_no !== undefined) student.passport_no = passport_no;
+    if (passport_expiry !== undefined) student.passport_expiry = passport_expiry;
+    if (visa_status !== undefined) student.visa_status = visa_status;
+    if (profession !== undefined) student.profession = profession;
+    if (lead_source !== undefined) student.lead_source = lead_source;
+    if (educational_details !== undefined) student.educational_details = normalizeEducationDetails(educational_details);
+    if (employment_details !== undefined) student.employment_details = normalizeEmploymentDetails(employment_details);
+    if (post_course_goal_type !== undefined) {
+      student.post_course_goal_type = normalizePostCourseGoalType(post_course_goal_type);
+      student.target_country = student.post_course_goal_type === 'specific_country' ? String(target_country || '').trim() || null : null;
+    }
+    if (english_level !== undefined) student.english_level = normalizeEnglishLevel(english_level);
+
+    await student.save();
+
+    // If name changed, update user
+    if (first_name || last_name) {
+      const user = await User.findByPk(student.user_id);
+      if (user) {
+        user.name = `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'No Name Provided';
+        await user.save();
+      }
+    }
+
+    const updatedStudent = await Student.findOne({
+      where: { id: student.id, branch_id: branchId },
+      include: [
+        { model: User },
+        { model: Batch, include: [{ model: Course, attributes: ['id', 'title'] }] }
+      ]
+    });
+    const feeSummaryMap = await buildFeeSummaryMap(branchId, [updatedStudent.id]);
+    const rejectedFeeMap = await buildRejectedFeeMap(branchId, [updatedStudent.id]);
+    res.json(decorateStudent(updatedStudent, feeSummaryMap.get(updatedStudent.id) || null, rejectedFeeMap.get(updatedStudent.id) || []));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.uploadPhoto = async (req, res) => {
+  try {
+    const branchId = getEffectiveBranchId(req);
+    if (!branchId) return res.status(400).json({ error: 'Please select a specific branch' });
+
+    const student = await Student.findOne({ where: { id: req.params.id, branch_id: branchId } });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    student.photograph_url = `/uploads/${req.file.filename}`;
+    await student.save();
+
+    res.json({ message: 'Photo uploaded', photograph_url: student.photograph_url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getStudentActivities = async (req, res) => {
+  try {
+    const branchId = getEffectiveBranchId(req);
+    if (!branchId) return res.status(400).json({ error: 'Please select a specific branch' });
+
+    const activities = await Activity.findAll({
+      where: { student_id: req.params.id, branch_id: branchId },
+      include: [{ model: User, as: 'Creator', attributes: ['id', 'name'] }],
+      order: [['created_at', 'DESC']]
+    });
+
+    res.json(activities);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.createStudentActivity = async (req, res) => {
+  try {
+    const branchId = getEffectiveBranchId(req);
+    if (!branchId) return res.status(400).json({ error: 'Please select a specific branch' });
+
+    const { type, subject, description } = req.body;
+    const activity = await Activity.create({
+      branch_id: branchId,
+      student_id: req.params.id,
+      type: type || 'note',
+      subject: subject || 'Student Activity',
+      description,
+      created_by: req.user.id
+    });
+
+    const newActivity = await Activity.findByPk(activity.id, {
+      include: [{ model: User, as: 'Creator', attributes: ['id', 'name'] }]
+    });
+
+    res.status(201).json(newActivity);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.updateStudentManagement = async (req, res) => {
   try {
     const branchId = getEffectiveBranchId(req);
@@ -232,7 +540,64 @@ exports.updateStudentManagement = async (req, res) => {
       ]
     });
 
-    res.json(decorateStudent(updatedStudent));
+    const feeSummaryMap = await buildFeeSummaryMap(branchId, [updatedStudent.id]);
+    const rejectedFeeMap = await buildRejectedFeeMap(branchId, [updatedStudent.id]);
+    res.json(decorateStudent(updatedStudent, feeSummaryMap.get(updatedStudent.id) || null, rejectedFeeMap.get(updatedStudent.id) || []));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.updateStudentSuccessRecord = async (req, res) => {
+  try {
+    const branchId = getEffectiveBranchId(req);
+    if (!branchId) return res.status(400).json({ error: 'Please select a specific branch' });
+
+    const student = await Student.findOne({ where: { id: req.params.id, branch_id: branchId } });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const finalCourseResult = normalizeNullableText(req.body.final_course_result);
+    const successDestinationCountry = normalizeNullableText(req.body.success_destination_country);
+    const successNotes = normalizeNullableText(req.body.success_notes);
+    const successRecordedAt = req.body.success_recorded_at ? new Date(req.body.success_recorded_at) : new Date();
+
+    if (req.body.success_recorded_at && Number.isNaN(successRecordedAt.getTime())) {
+      return res.status(400).json({ error: 'Invalid success recorded date' });
+    }
+
+    student.final_course_result = finalCourseResult;
+    student.success_destination_country = successDestinationCountry;
+    student.success_notes = successNotes;
+    
+    const wasRecorded = !!student.success_recorded_at;
+    student.success_recorded_at = finalCourseResult || successDestinationCountry || successNotes ? successRecordedAt : null;
+    await student.save();
+
+    // Auto-log 'Passed Course' activity if first time saving final course result
+    if (!wasRecorded && student.success_recorded_at) {
+      await Activity.create({
+        branch_id: branchId,
+        student_id: student.id,
+        type: 'task',
+        subject: 'Passed Course',
+        description: `Student achieved result: ${finalCourseResult || 'N/A'}. Destination: ${successDestinationCountry || 'N/A'}.`,
+        created_by: req.user.id,
+        is_done: true,
+        completed_at: new Date()
+      });
+    }
+
+    const updatedStudent = await Student.findOne({
+      where: { id: student.id, branch_id: branchId },
+      include: [
+        { model: User },
+        { model: Batch, include: [{ model: Course, attributes: ['id', 'title', 'duration_weeks'] }] }
+      ]
+    });
+
+    const feeSummaryMap = await buildFeeSummaryMap(branchId, [updatedStudent.id]);
+    const rejectedFeeMap = await buildRejectedFeeMap(branchId, [updatedStudent.id]);
+    res.json(decorateStudent(updatedStudent, feeSummaryMap.get(updatedStudent.id) || null, rejectedFeeMap.get(updatedStudent.id) || []));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

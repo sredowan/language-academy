@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Edit2, Trash2, X, ChevronDown } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X } from 'lucide-react';
 import api from '../../services/api';
 import { inputStyle, stageColors, stageLabels, stageIcons } from './CRMComponents';
 
@@ -8,9 +8,12 @@ const ContactsTab = ({ contacts, onRefresh }) => {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ name: '', phone: '', email: '', company: '', source: 'Walk-in', notes: '' });
   const [saving, setSaving] = useState(false);
+  const [statusSavingId, setStatusSavingId] = useState(null);
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const leadStages = ['new', 'contacted', 'interested', 'trial', 'enrolled', 'fees_pending', 'payment_rejected', 'successful', 'lost'];
 
   const sources = [...new Set(contacts.map(c => c.source).filter(Boolean))];
 
@@ -48,6 +51,19 @@ const ContactsTab = ({ contacts, onRefresh }) => {
   const handleDelete = async (id) => {
     try { await api.delete(`/crm/contacts/${id}`); setConfirmDelete(null); onRefresh(); }
     catch { alert('Failed to delete'); }
+  };
+
+  const updateLeadPosition = async (contact, status) => {
+    if (!contact.CurrentLead?.id) return;
+    setStatusSavingId(contact.id);
+    try {
+      await api.patch(`/crm/leads/${contact.CurrentLead.id}/status`, { status });
+      onRefresh();
+    } catch {
+      alert('Failed to update pipeline position');
+    } finally {
+      setStatusSavingId(null);
+    }
   };
 
   return (
@@ -106,15 +122,15 @@ const ContactsTab = ({ contacts, onRefresh }) => {
 
       {/* Contact Table */}
       <div className="glass-morphism" style={{ padding: '0.5rem', borderRadius: '12px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.8fr 1fr 1fr 0.8fr 0.6fr', gap: '0.5rem', padding: '0.6rem 1rem', fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', fontWeight: '700', letterSpacing: '0.5px' }}>
-          <span>Name</span><span>Phone</span><span>Email</span><span>Source</span><span>Company</span><span>Since</span><span>Actions</span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.1fr 1.5fr 1fr 1fr 0.9fr 1.25fr 0.7fr', gap: '0.5rem', padding: '0.6rem 1rem', fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', fontWeight: '700', letterSpacing: '0.5px' }}>
+          <span>Name</span><span>Phone</span><span>Email</span><span>Source</span><span>Company</span><span>Since</span><span>Lead Position</span><span>Actions</span>
         </div>
         {filtered.length === 0 ? (
           <p style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '3rem', fontSize: '0.85rem' }}>
             {contacts.length === 0 ? 'No contacts yet. They are auto-created when leads are enrolled.' : 'No contacts match your filters.'}
           </p>
         ) : filtered.map(c => (
-          <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.8fr 1fr 1fr 0.8fr 0.6fr', gap: '0.5rem', padding: '0.65rem 1rem', borderBottom: '1px solid var(--border)', fontSize: '0.82rem', alignItems: 'center', transition: 'background 0.15s' }}
+          <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.1fr 1.5fr 1fr 1fr 0.9fr 1.25fr 0.7fr', gap: '0.5rem', padding: '0.65rem 1rem', borderBottom: '1px solid var(--border)', fontSize: '0.82rem', alignItems: 'center', transition: 'background 0.15s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--glass)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             <div>
@@ -125,7 +141,30 @@ const ContactsTab = ({ contacts, onRefresh }) => {
             <span style={{ color: 'var(--text-dim)', fontSize: '0.78rem' }}>{c.email || '—'}</span>
             <span style={{ fontSize: '0.62rem', padding: '2px 8px', background: 'var(--glass)', borderRadius: '8px', width: 'fit-content', fontWeight: '600' }}>{c.source || '—'}</span>
             <span style={{ color: 'var(--text-dim)', fontSize: '0.78rem' }}>{c.company || '—'}</span>
-            <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{new Date(c.created_at).toLocaleDateString()}</span>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>Since {new Date(c.createdAt || c.created_at).toLocaleDateString()}</span>
+            <div>
+              {c.CurrentLead ? (
+                <select
+                  value={c.CurrentLead.status}
+                  onChange={(e) => updateLeadPosition(c, e.target.value)}
+                  disabled={statusSavingId === c.id}
+                  style={{
+                    ...inputStyle,
+                    padding: '0.38rem 0.55rem',
+                    fontSize: '0.72rem',
+                    color: stageColors[c.CurrentLead.status] || 'var(--text)',
+                    borderColor: `${stageColors[c.CurrentLead.status] || '#475569'}55`,
+                    background: 'var(--glass)'
+                  }}
+                >
+                  {leadStages.map((stage) => (
+                    <option key={stage} value={stage}>{stageLabels[stage] || stage}</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>No lead</span>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: '0.3rem' }}>
               <button onClick={() => startEdit(c)} style={{ padding: '3px 6px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }} title="Edit">
                 <Edit2 size={12} />

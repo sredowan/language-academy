@@ -29,12 +29,12 @@ const CommunityHub = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black">Community Lounge</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">Learn, share, and compete with 5,000+ PTE candidates.</p>
+          <p className="text-[var(--text-dim)] mt-1 font-medium">Learn, share, and compete with 5,000+ PTE candidates.</p>
         </div>
         {!isPremium && (
           <button 
             onClick={() => navigate('/subscription')}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-indigo-600/20 hover:scale-105 transition-transform"
+            className="flex items-center gap-2 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white px-6 py-3 rounded-2xl font-bold text-sm shadow-xl shadow-indigo-600/20 hover:scale-105 transition-transform"
           >
             <Zap className="w-4 h-4 fill-white" /> Go Premium to Join
           </button>
@@ -45,7 +45,7 @@ const CommunityHub = () => {
         
         {/* Main Feed / Groups */}
         <div className="lg:col-span-2 space-y-8">
-           <div className="flex items-center gap-4 bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+           <div className="flex items-center gap-4 glass-morphism p-2 rounded-2xl border border-[var(--border)] border-[var(--border)] shadow-sm">
              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
                <Search className="w-5 h-5 text-gray-400" />
              </div>
@@ -54,9 +54,9 @@ const CommunityHub = () => {
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {groups.map((group, i) => (
-                <div key={i} className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group">
+                <div key={i} className="glass-morphism rounded-3xl p-6 border border-[var(--border)] border-[var(--border)] shadow-sm hover:shadow-md transition-all group">
                    <div className="flex items-center justify-between mb-4">
-                      <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl text-indigo-600">
+                      <div className="p-3 bg-[var(--glass)] dark:bg-indigo-900/20 rounded-2xl text-[var(--primary)]">
                          <Users className="w-6 h-6" />
                       </div>
                       <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 uppercase">
@@ -72,7 +72,7 @@ const CommunityHub = () => {
                    </div>
                    <button 
                      disabled={!isPremium}
-                     className="w-full py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-black rounded-xl text-xs flex items-center justify-center gap-2 group-hover:bg-indigo-600 group-hover:text-white transition-all disabled:opacity-50"
+                     className="w-full py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-black rounded-xl text-xs flex items-center justify-center gap-2 group-hover:bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white group-hover:text-white transition-all disabled:opacity-50"
                    >
                      View Discussions <ArrowRight className="w-4 h-4" />
                    </button>
@@ -81,13 +81,13 @@ const CommunityHub = () => {
            </div>
 
            {/* Placeholder for Feed */}
-           <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm space-y-8">
+           <div className="glass-morphism rounded-3xl p-8 border border-[var(--border)] border-[var(--border)] shadow-sm space-y-8">
               <h3 className="font-black text-lg">Daily Strategy Poll</h3>
-              <div className="p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/40">
-                 <p className="font-bold text-indigo-900 dark:text-indigo-200 mb-4">Which section do you find hardest to score 79+ in?</p>
+              <div className="p-6 bg-[var(--glass)] dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/40">
+                 <p className="font-bold text-[var(--text-main)] dark:text-indigo-200 mb-4">Which section do you find hardest to score 79+ in?</p>
                  <div className="space-y-3">
                     {['Speaking - DI/RL', 'Writing - Essay', 'Reading - FIB', 'Listening - WFD'].map((opt, i) => (
-                      <button key={i} className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-xl border border-indigo-100 dark:border-indigo-800/20 text-xs font-bold hover:shadow-sm transition-all">
+                      <button key={i} className="w-full flex items-center justify-between p-3 glass-morphism rounded-xl border border-indigo-100 dark:border-indigo-800/20 text-xs font-bold hover:shadow-sm transition-all">
                         <span>{opt}</span>
                         <span className="opacity-40">{25 - i * 5}%</span>
                       </button>
@@ -99,7 +99,7 @@ const CommunityHub = () => {
 
         {/* Sidebar: Leaderboard & Stats */}
         <div className="space-y-8">
-           <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm relative overflow-hidden">
+           <div className="glass-morphism rounded-3xl p-8 border border-[var(--border)] border-[var(--border)] shadow-sm relative overflow-hidden">
               <h3 className="font-black text-lg mb-6 flex items-center gap-2">
                  <Trophy className="w-6 h-6 text-yellow-500" /> Weekly Stars
               </h3>
@@ -121,11 +121,11 @@ const CommunityHub = () => {
                             </div>
                          </div>
                       </div>
-                      <div className="text-sm font-black text-indigo-600">{user.score} avg</div>
+                      <div className="text-sm font-black text-[var(--primary)]">{user.score} avg</div>
                    </div>
                  ))}
               </div>
-              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-indigo-50 dark:bg-indigo-900/20 rounded-full blur-3xl"></div>
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[var(--glass)] dark:bg-indigo-900/20 rounded-full blur-3xl"></div>
            </div>
 
            <div className="bg-gradient-to-br from-gray-900 to-indigo-900 rounded-3xl p-8 text-white">
@@ -140,13 +140,13 @@ const CommunityHub = () => {
               </div>
               <button 
                 disabled={!isPremium}
-                className="w-full py-3 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-500 transition-all text-xs"
+                className="w-full py-3 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-black rounded-xl hover:bg-[var(--glass)]0 transition-all text-xs"
               >
                 Set Reminder
               </button>
            </div>
 
-           <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm text-center">
+           <div className="glass-morphism rounded-3xl p-6 border border-[var(--border)] border-[var(--border)] shadow-sm text-center">
               <div className="flex items-center justify-center gap-4 mb-4">
                  <div className="flex -space-x-3">
                     {[1,2,3,4].map(i => (

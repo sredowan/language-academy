@@ -155,6 +155,7 @@ const AdminLiquidAccounts = () => {
               <option value="cash">Physical Cash Drawer</option>
             </select>
           </div>
+
           <div className="form-group">
             <label>Legal Account Identity (Name)</label>
             <input required className="glass-input" placeholder="e.g. Brac Bank - Main Branch" value={newAccData.name} onChange={e => setNewAccData({...newAccData, name: e.target.value})} />

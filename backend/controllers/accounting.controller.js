@@ -52,21 +52,39 @@ exports.createJournalEntry = async (req, res) => {
 // ── NEW: Transaction Journal (Full listing) ──
 exports.getJournal = async (req, res) => {
   try {
-    const { search, type } = req.query;
-    const entryWhere = {};
+    const { search, type, from, to, account_id } = req.query;
+    const entryWhere = { branch_id: req.branchId };
     if (search) {
       entryWhere[Op.or] = [
         { ref_no: { [Op.like]: `%${search}%` } },
         { description: { [Op.like]: `%${search}%` } }
       ];
     }
+    
+    const lineWhere = {};
+    if (account_id && account_id !== 'all') {
+      lineWhere.account_id = account_id;
+    }
+
+    if (from && to) {
+      const endDate = new Date(to);
+      endDate.setHours(23, 59, 59, 999);
+      entryWhere.date = { [Op.between]: [new Date(from), endDate] };
+    } else if (from) {
+      entryWhere.date = { [Op.gte]: new Date(from) };
+    } else if (to) {
+      const endDate = new Date(to);
+      endDate.setHours(23, 59, 59, 999);
+      entryWhere.date = { [Op.lte]: endDate };
+    }
 
     const lines = await JournalLine.findAll({
+      where: lineWhere,
       include: [
         { model: JournalEntry, where: entryWhere, include: [{ model: User, as: 'Poster', attributes: ['name'] }] },
         { model: Account, attributes: ['name', 'code', 'type'] }
       ],
-      order: [[JournalEntry, 'date', 'DESC'], ['id', 'ASC']],
+      order: [[JournalEntry, 'date', 'DESC'], ['id', 'DESC']],
       limit: 200
     });
 
@@ -98,7 +116,49 @@ exports.getLedgerSummary = async (req, res) => {
         });
       }
     }
-    res.json(summary);
+    res.json({ accounts: summary });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ── NEW: Account Detailed Ledger (Drill-Down) ──
+exports.getLedgerAccountDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const account = await Account.findByPk(id);
+    if (!account) return res.status(404).json({ error: 'Account not found' });
+
+    const lines = await JournalLine.findAll({
+      where: { account_id: id },
+      include: [{ model: JournalEntry }],
+      order: [[JournalEntry, 'date', 'ASC'], ['id', 'ASC']]
+    });
+
+    let balance = 0;
+    const history = lines.map(line => {
+      // Normal balances: Assets & Expenses increase with Debits. Liabilities, Equity, Revenue increase with Credits.
+      const debit = parseFloat(line.debit || 0);
+      const credit = parseFloat(line.credit || 0);
+      
+      if (account.type === 'asset' || account.type === 'expense') {
+        balance = balance + debit - credit;
+      } else {
+        balance = balance + credit - debit;
+      }
+
+      return {
+        id: line.id,
+        date: line.JournalEntry?.date,
+        ref_no: line.JournalEntry?.ref_no,
+        description: line.description || line.JournalEntry?.description,
+        debit,
+        credit,
+        running_balance: balance
+      };
+    });
+
+    res.json({ account, history });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

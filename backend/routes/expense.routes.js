@@ -20,6 +20,9 @@ router.put('/:id/verify', expenseController.verifyExpense);
 router.put('/:id/approve', expenseController.approveExpense);
 router.put('/:id/reject', expenseController.rejectExpense);
 
+// Delete expense (soft-delete with reason + journal reversal)
+router.delete('/:id', expenseController.deleteExpense);
+
 // Expense Category routes
 router.get('/categories', expenseController.getExpenseCategories);
 router.get('/categories/flat', expenseController.getAllCategoriesFlat);

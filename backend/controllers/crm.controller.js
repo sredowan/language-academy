@@ -14,7 +14,36 @@ const Student = require('../models/Student');
 const Enrollment = require('../models/Enrollment');
 const sequelize = require('../config/db.config');
 const { fn, col, literal, Op } = require('sequelize');
+const bcrypt = require('bcryptjs');
 const automationService = require('../services/automation.service');
+const communicationService = require('../services/communication.service');
+
+const normalizeEducationDetails = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const normalizeEmploymentDetails = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+  return value;
+};
 
 // ============================================================
 //  COURSES (for CRM course picker)
@@ -177,34 +206,127 @@ exports.enrollLead = async (req, res) => {
     const lead = await Lead.findOne({ where: { id: req.params.id, branch_id: req.branchId } });
     if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
-    const { batch_id } = req.body;
+    const {
+      batch_id,
+      name,
+      email,
+      password,
+      first_name,
+      middle_name,
+      last_name,
+      father_name,
+      mother_name,
+      mobile_no,
+      nid_birth_cert,
+      current_address,
+      permanent_address,
+      passport_no,
+      photograph_url,
+      educational_details,
+      employment_details
+    } = req.body;
     const courseId = lead.course_id || req.body.course_id;
     if (!courseId) return res.status(400).json({ error: 'No course selected. Please select a course first.' });
 
     const course = await Course.findByPk(courseId);
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
+    const batchWhere = { id: batch_id, branch_id: req.branchId };
+
     // Find batch
     let batch = null;
     if (batch_id) {
-      batch = await Batch.findByPk(batch_id);
+      batch = await Batch.findOne({ where: batchWhere, transaction: t });
+      if (!batch) return res.status(400).json({ error: 'Invalid batch selected for this branch.' });
     } else {
       batch = await Batch.findOne({
-        where: { course_id: courseId, status: { [Op.in]: ['enrolling', 'starting_soon'] } },
+        where: { branch_id: req.branchId, course_id: courseId, status: { [Op.in]: ['enrolling', 'starting_soon'] } },
         order: [['start_date', 'ASC']]
       });
     }
 
-    // 1. Create enrollment WITHOUT student_id (pending POS collection)
+    const fullName = (name || `${first_name || lead.name?.split(' ')[0] || ''} ${last_name || lead.name?.split(' ').slice(1).join(' ') || ''}`.trim() || lead.name).trim();
+    const primaryEmail = (email || lead.email || '').trim();
+    const userEmail = primaryEmail || `lead-${lead.id}@languageacademy.local`;
+
+    let user = await User.findOne({ where: { email: userEmail }, transaction: t });
+    if (!user && primaryEmail && primaryEmail !== userEmail) {
+      user = await User.findOne({ where: { email: primaryEmail }, transaction: t });
+    }
+
+    if (!user) {
+      const hashedPassword = await bcrypt.hash(password || 'Student123', 10);
+      user = await User.create({
+        name: fullName,
+        email: userEmail,
+        password: hashedPassword,
+        role: 'student',
+        branch_id: req.branchId,
+      }, { transaction: t });
+    } else {
+      await user.update({
+        name: fullName,
+        branch_id: req.branchId,
+      }, { transaction: t });
+    }
+
+    let student = await Student.findOne({ where: { user_id: user.id, branch_id: req.branchId }, transaction: t });
+    if (!student) {
+      student = await Student.create({
+        user_id: user.id,
+        branch_id: req.branchId,
+        batch_id: batch?.id || null,
+        first_name: first_name || fullName.split(' ')[0] || lead.name.split(' ')[0],
+        middle_name: middle_name || null,
+        last_name: last_name || fullName.split(' ').slice(1).join(' ') || '',
+        father_name: father_name || null,
+        mother_name: mother_name || null,
+        mobile_no: mobile_no || lead.phone || null,
+        nid_birth_cert: nid_birth_cert || null,
+        current_address: current_address || null,
+        permanent_address: permanent_address || null,
+        passport_no: passport_no || null,
+        photograph_url: photograph_url || null,
+        educational_details: normalizeEducationDetails(educational_details),
+        employment_details: normalizeEmploymentDetails(employment_details),
+        enrollment_date: new Date(),
+        status: 'active',
+      }, { transaction: t });
+    } else {
+      await student.update({
+        batch_id: batch?.id || student.batch_id,
+        first_name: first_name || student.first_name || fullName.split(' ')[0],
+        middle_name: middle_name !== undefined ? middle_name : student.middle_name,
+        last_name: last_name || student.last_name || fullName.split(' ').slice(1).join(' '),
+        father_name: father_name !== undefined ? father_name : student.father_name,
+        mother_name: mother_name !== undefined ? mother_name : student.mother_name,
+        mobile_no: mobile_no || student.mobile_no || lead.phone,
+        nid_birth_cert: nid_birth_cert !== undefined ? nid_birth_cert : student.nid_birth_cert,
+        current_address: current_address !== undefined ? current_address : student.current_address,
+        permanent_address: permanent_address !== undefined ? permanent_address : student.permanent_address,
+        passport_no: passport_no !== undefined ? passport_no : student.passport_no,
+        photograph_url: photograph_url !== undefined ? photograph_url : student.photograph_url,
+        educational_details: educational_details !== undefined ? normalizeEducationDetails(educational_details) : student.educational_details,
+        employment_details: employment_details !== undefined ? normalizeEmploymentDetails(employment_details) : student.employment_details,
+        enrollment_date: student.enrollment_date || new Date(),
+        status: student.status || 'active',
+      }, { transaction: t });
+    }
+
+    // 1. Create enrollment with linked student profile
     const enrollment = await Enrollment.create({
       branch_id: req.branchId,
-      student_id: null,
+      student_id: student.id,
       batch_id: batch?.id || null,
       total_fee: course.base_fee,
       discount: 0,
       paid_amount: 0,
       status: 'pending',
     }, { transaction: t });
+
+    if (batch?.id) {
+      await Batch.increment('enrolled', { by: 1, where: { id: batch.id }, transaction: t });
+    }
 
     // 2. Create pending invoice linked to enrollment
     const invCount = await Invoice.count({ where: { branch_id: req.branchId } });
@@ -213,11 +335,12 @@ exports.enrollLead = async (req, res) => {
       branch_id: req.branchId,
       invoice_no: invoiceNo,
       enrollment_id: enrollment.id,
+      student_id: student.id,
       amount: course.base_fee,
       paid: 0,
       status: 'pending',
       due_date: new Date(Date.now() + 14 * 86400000),
-      notes: `CRM Lead: ${lead.name} — ${course.title}. Pending fee collection via POS.`,
+      notes: `CRM Lead ID: ${lead.id} | CRM Lead: ${lead.name} — ${course.title}. Pending fee collection via POS.`,
     }, { transaction: t });
 
     // 3. Create contact
@@ -243,20 +366,27 @@ exports.enrollLead = async (req, res) => {
       course_interest: course.title,
       assigned_to: lead.counselor_id || req.user.id,
       expected_close: lead.expected_close,
+      description: `Enrollment ID: ${enrollment.id}`,
     }, { transaction: t });
 
     // 5. Move lead to fees_pending (not successful yet — POS decides that)
     await lead.update({
       status: 'fees_pending',
       deal_value: course.base_fee,
+      email: primaryEmail || lead.email,
+      phone: mobile_no || lead.phone,
       last_activity_at: new Date(),
+    }, { transaction: t });
+
+    await invoice.update({
+      notes: `${invoice.notes} | Opportunity ID: ${opportunity.id}`
     }, { transaction: t });
 
     await t.commit();
 
     res.status(201).json({
-      message: `Enrollment created for ${course.title}. Invoice ${invoiceNo} pending. Collect fee via POS to complete.`,
-      enrollment, invoice, opportunity, contact,
+      message: `Student, enrollment, and invoice created for ${course.title}. Invoice ${invoiceNo} is ready for POS collection.`,
+      student, enrollment, invoice, opportunity, contact,
     });
   } catch (error) {
     await t.rollback();
@@ -361,7 +491,44 @@ exports.getContacts = async (req, res) => {
       where: { branch_id: req.branchId, is_active: true },
       order: [['created_at', 'DESC']]
     });
-    res.json(contacts);
+
+    const contactIds = contacts.map((contact) => contact.id);
+    let contactLeadMap = new Map();
+
+    if (contactIds.length > 0) {
+      const opportunities = await Opportunity.findAll({
+        where: { branch_id: req.branchId, contact_id: { [Op.in]: contactIds } },
+        attributes: ['id', 'contact_id', 'lead_id', 'created_at'],
+        order: [['created_at', 'DESC']]
+      });
+
+      const leadIds = [...new Set(opportunities.map((opportunity) => opportunity.lead_id).filter(Boolean))];
+      const leads = leadIds.length > 0
+        ? await Lead.findAll({
+          where: { branch_id: req.branchId, id: { [Op.in]: leadIds } },
+          attributes: ['id', 'status', 'course_id', 'batch_interest', 'updated_at']
+        })
+        : [];
+
+      const leadMap = new Map(leads.map((lead) => [lead.id, lead]));
+      opportunities.forEach((opportunity) => {
+        if (!contactLeadMap.has(opportunity.contact_id) && leadMap.has(opportunity.lead_id)) {
+          const lead = leadMap.get(opportunity.lead_id);
+          contactLeadMap.set(opportunity.contact_id, {
+            id: lead.id,
+            status: lead.status,
+            course_id: lead.course_id,
+            batch_interest: lead.batch_interest,
+            updated_at: lead.updated_at
+          });
+        }
+      });
+    }
+
+    res.json(contacts.map((contact) => ({
+      ...contact.toJSON(),
+      CurrentLead: contactLeadMap.get(contact.id) || null
+    })));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -600,12 +767,23 @@ exports.sendCampaign = async (req, res) => {
     const leadWhere = { branch_id: req.branchId };
     if (statusMap[campaign.target_audience]) leadWhere.status = statusMap[campaign.target_audience];
 
-    const recipientCount = campaign.target_audience.includes('contact')
-      ? await Contact.count({ where: { branch_id: req.branchId, is_active: true } })
-      : await Lead.count({ where: leadWhere });
+    let recipients = [];
+    if (campaign.target_audience.includes('contact')) {
+      recipients = await Contact.findAll({ where: { branch_id: req.branchId, is_active: true } });
+    } else {
+      recipients = await Lead.findAll({ where: leadWhere });
+    }
+
+    const recipientCount = recipients.length;
 
     await campaign.update({ status: 'sent', sent_at: new Date(), sent_count: recipientCount });
-    res.json({ message: `Campaign sent to ${recipientCount} recipients`, campaign });
+    
+    // Process the dispatch asynchronously to not block the response
+    communicationService.processCampaignBatch(campaign, recipients).catch(err => {
+      console.error('[CRM_CONTROLLER] Error processing campaign batch async:', err);
+    });
+
+    res.json({ message: `Campaign sending initiated for ${recipientCount} recipients in the background.`, campaign });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -627,7 +805,7 @@ exports.deleteCampaign = async (req, res) => {
 exports.getFunnel = async (req, res) => {
   try {
     const branchId = req.branchId;
-    const stages = ['new', 'contacted', 'interested', 'trial', 'enrolled', 'fees_pending', 'successful', 'lost'];
+    const stages = ['new', 'contacted', 'interested', 'trial', 'enrolled', 'fees_pending', 'payment_rejected', 'successful', 'lost'];
     const counts = await Promise.all(
       stages.map(s => Lead.count({ where: { branch_id: branchId, status: s } }))
     );
@@ -637,7 +815,8 @@ exports.getFunnel = async (req, res) => {
       count: counts[i],
       conversionRate: totalActive > 0 ? ((counts[i] / totalActive) * 100).toFixed(1) : 0
     }));
-    const successCount = counts[6]; // successful
+    const successCount = counts[7]; // successful
+    const paymentRejectedCount = counts[6];
     const overallConversion = totalActive > 0 ? ((successCount / totalActive) * 100).toFixed(1) : 0;
 
     // Revenue = only from "successful" leads' deal_value
@@ -645,7 +824,11 @@ exports.getFunnel = async (req, res) => {
       where: { branch_id: branchId, status: 'successful' }
     }) || 0;
 
-    res.json({ funnel, overallConversion, successfulRevenue });
+    const rejectedRevenue = await Lead.sum('deal_value', {
+      where: { branch_id: branchId, status: 'payment_rejected' }
+    }) || 0;
+
+    res.json({ funnel, overallConversion, successfulRevenue, paymentRejectedCount, rejectedRevenue });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -659,6 +842,7 @@ exports.getSourceAnalysis = async (req, res) => {
         'source',
         [fn('COUNT', col('id')), 'total'],
         [fn('SUM', literal("CASE WHEN status='successful' THEN 1 ELSE 0 END")), 'converted'],
+        [fn('SUM', literal("CASE WHEN status='payment_rejected' THEN 1 ELSE 0 END")), 'payment_rejected'],
         [fn('SUM', literal("CASE WHEN status='successful' THEN deal_value ELSE 0 END")), 'revenue'],
       ],
       group: ['source'],
@@ -692,6 +876,46 @@ exports.getRevenueForecast = async (req, res) => {
       };
     });
     res.json({ totalPipelineValue, weightedForecast, realRevenue, byStage });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getSuccessResultsAnalysis = async (req, res) => {
+  try {
+    const rows = await Student.findAll({
+      where: {
+        branch_id: req.branchId,
+        final_course_result: { [Op.not]: null }
+      },
+      attributes: [
+        'final_course_result',
+        [fn('COUNT', col('id')), 'count']
+      ],
+      group: ['final_course_result'],
+      order: [[literal('count'), 'DESC']]
+    });
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getSuccessDestinationAnalysis = async (req, res) => {
+  try {
+    const rows = await Student.findAll({
+      where: {
+        branch_id: req.branchId,
+        success_destination_country: { [Op.not]: null }
+      },
+      attributes: [
+        'success_destination_country',
+        [fn('COUNT', col('id')), 'count']
+      ],
+      group: ['success_destination_country'],
+      order: [[literal('count'), 'DESC']]
+    });
+    res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

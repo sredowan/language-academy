@@ -2,10 +2,10 @@
     /* Language Academy - Professional SaaS Design Tokens */
     --bg-deep: #010203;
     --bg-card: rgba(15, 23, 42, 0.6);
-    --primary: #32619A;
-    --primary-glow: rgba(50, 97, 154, 0.3);
-    --accent: #95C04D;
-    --success: #95C04D;
+    --primary: #7bc62e;
+    --primary-glow: rgba(123, 198, 46, 0.3);
+    --accent: #275fa7;
+    --success: #7bc62e;
     --warning: #f59e0b;
     --danger: #ef4444;
     --text-main: #FBFCFC;
@@ -24,9 +24,9 @@
 :root.light {
     --bg-deep: #FBFCFC;
     --bg-card: rgba(255, 255, 255, 0.9);
-    --primary: #32619A;
-    --primary-glow: rgba(50, 97, 154, 0.1);
-    --accent: #95C04D;
+    --primary: #7bc62e;
+    --primary-glow: rgba(123, 198, 46, 0.1);
+    --accent: #275fa7;
     --text-main: #010203;
     --text-dim: #64748b;
     --border: rgba(0, 0, 0, 0.06);
@@ -124,8 +124,8 @@ button {
     margin-left: var(--sidebar-width);
     min-height: 100vh;
     background:
-        radial-gradient(circle at top right, rgba(149, 192, 77, 0.12), transparent 25%),
-        radial-gradient(circle at top left, rgba(50, 97, 154, 0.2), transparent 30%),
+        radial-gradient(circle at top right, rgba(39, 95, 167, 0.12), transparent 25%),
+        radial-gradient(circle at top left, rgba(123, 198, 46, 0.2), transparent 30%),
         var(--bg-deep);
 }
 
@@ -206,7 +206,7 @@ button {
     overflow: hidden;
     padding: 1.5rem;
     background:
-        linear-gradient(145deg, rgba(50, 97, 154, 0.24), rgba(149, 192, 77, 0.12)),
+        linear-gradient(145deg, rgba(123, 198, 46, 0.24), rgba(39, 95, 167, 0.12)),
         var(--bg-card);
 }
 
@@ -217,7 +217,7 @@ button {
     height: 180px;
     right: -60px;
     top: -90px;
-    background: radial-gradient(circle, rgba(149, 192, 77, 0.18), transparent 65%);
+    background: radial-gradient(circle, rgba(39, 95, 167, 0.18), transparent 65%);
 }
 
 .pte-kpi-grid {
@@ -263,9 +263,9 @@ button {
 }
 
 .pte-tab.active {
-    background: rgba(50, 97, 154, 0.16);
+    background: rgba(123, 198, 46, 0.16);
     color: var(--text-main);
-    border-color: rgba(50, 97, 154, 0.4);
+    border-color: rgba(123, 198, 46, 0.4);
 }
 
 .pte-grid-two {
@@ -311,8 +311,8 @@ button {
 
 .pte-filter.active {
     color: var(--text-main);
-    background: rgba(149, 192, 77, 0.12);
-    border-color: rgba(149, 192, 77, 0.35);
+    background: rgba(123, 198, 46, 0.12);
+    border-color: rgba(123, 198, 46, 0.35);
 }
 
 .pte-attempt-shell {
@@ -362,7 +362,7 @@ button {
 }
 
 .pte-primary {
-    background: linear-gradient(135deg, var(--primary), #3d77bf);
+    background: linear-gradient(135deg, var(--primary), #8cd93d);
     color: white;
 }
 
@@ -386,8 +386,8 @@ button {
 .pte-score-box {
     padding: 0.85rem;
     border-radius: 16px;
-    background: rgba(149, 192, 77, 0.08);
-    border: 1px solid rgba(149, 192, 77, 0.2);
+    background: rgba(123, 198, 46, 0.08);
+    border: 1px solid rgba(123, 198, 46, 0.2);
 }
 
 .pte-empty {

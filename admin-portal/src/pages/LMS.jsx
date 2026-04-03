@@ -8,9 +8,11 @@ import {
   BookOpen,
   Globe,
   Search,
-  Filter
+  Filter,
+  Upload
 } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import '../styles/GlobalStyles.css';
 
@@ -44,7 +46,9 @@ const initialCourseData = {
   instructor_name: '',
   instructor_video_url: '',
   is_published: true,
-  status: 'active'
+  status: 'active',
+  what_you_will_learn: [],
+  modules: []
 };
 
 const readableSchedule = (schedule) => {
@@ -125,7 +129,7 @@ const toBatchFormData = (batch) => ({
   status: batch.status || 'enrolling'
 });
 
-const BatchCard = ({ batch, onManage }) => {
+const BatchCard = ({ batch, onManage, readOnly }) => {
   return (
     <div
       className="glass-morphism"
@@ -185,16 +189,16 @@ const BatchCard = ({ batch, onManage }) => {
 
       <button
         onClick={() => onManage(batch)}
-        className="btn-primary"
+        className={readOnly ? 'btn-secondary' : 'btn-primary'}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
       >
-        Manage Batch <ArrowRight size={16} />
+        {readOnly ? 'View Batch' : 'Manage Batch'} <ArrowRight size={16} />
       </button>
     </div>
   );
 };
 
-const CourseCard = ({ course, onEdit }) => {
+const CourseCard = ({ course, onEdit, readOnly }) => {
   return (
     <div
       className="glass-morphism"
@@ -245,18 +249,22 @@ const CourseCard = ({ course, onEdit }) => {
         {course.short_description || course.description || 'No description provided.'}
       </p>
 
-      <button
-        onClick={() => onEdit(course)}
-        className="btn-secondary"
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-      >
-        Edit Metadata <ArrowRight size={16} />
-      </button>
+      {!readOnly && (
+        <button
+          onClick={() => onEdit(course)}
+          className="btn-secondary"
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+        >
+          Edit Metadata <ArrowRight size={16} />
+        </button>
+      )}
     </div>
   );
 };
 
 const LMS = () => {
+  const { user } = useAuth();
+  const isAccountant = ['accounting', 'accounts'].includes(user?.role);
   const [activeTab, setActiveTab] = useState('courses');
   const [batches, setBatches] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -269,6 +277,7 @@ const LMS = () => {
   const [submitting, setSubmitting] = useState(false);
   const [manageSubmitting, setManageSubmitting] = useState(false);
   const [batchStudentsLoading, setBatchStudentsLoading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const [batchData, setBatchData] = useState(initialBatchData);
   const [courseData, setCourseData] = useState(initialCourseData);
@@ -388,7 +397,25 @@ const LMS = () => {
   };
 
   const openEditCourse = (course) => {
-    setCourseData({ ...course });
+    let parsedOutcomes = [];
+    if (typeof course.what_you_will_learn === 'string') {
+      try { parsedOutcomes = JSON.parse(course.what_you_will_learn); } catch {}
+    } else {
+      parsedOutcomes = course.what_you_will_learn || [];
+    }
+
+    let parsedModules = [];
+    if (typeof course.modules === 'string') {
+      try { parsedModules = JSON.parse(course.modules); } catch {}
+    } else {
+      parsedModules = course.modules || [];
+    }
+
+    setCourseData({ 
+      ...course, 
+      what_you_will_learn: Array.isArray(parsedOutcomes) ? parsedOutcomes : [],
+      modules: Array.isArray(parsedModules) ? parsedModules : []
+    });
     setIsCourseModalOpen(true);
   };
 
@@ -427,6 +454,80 @@ const LMS = () => {
     });
   };
 
+  const handleAddOutcome = () => {
+    setCourseData({ ...courseData, what_you_will_learn: [...(courseData.what_you_will_learn || []), ''] });
+  };
+
+  const handleRemoveOutcome = (index) => {
+    const updated = [...courseData.what_you_will_learn];
+    updated.splice(index, 1);
+    setCourseData({ ...courseData, what_you_will_learn: updated });
+  };
+
+  const handleUpdateOutcome = (index, value) => {
+    const updated = [...courseData.what_you_will_learn];
+    updated[index] = value;
+    setCourseData({ ...courseData, what_you_will_learn: updated });
+  };
+
+  const handleAddModule = () => {
+    setCourseData({
+      ...courseData, 
+      modules: [...(courseData.modules || []), { title: '', lessons: [] }]
+    });
+  };
+
+  const handleRemoveModule = (modIndex) => {
+    const updated = [...courseData.modules];
+    updated.splice(modIndex, 1);
+    setCourseData({ ...courseData, modules: updated });
+  };
+
+  const handleUpdateModuleTitle = (modIndex, value) => {
+    const updated = [...courseData.modules];
+    updated[modIndex].title = value;
+    setCourseData({ ...courseData, modules: updated });
+  };
+
+  const handleAddLesson = (modIndex) => {
+    const updated = [...courseData.modules];
+    updated[modIndex].lessons.push({ title: '', duration: '' });
+    setCourseData({ ...courseData, modules: updated });
+  };
+
+  const handleRemoveLesson = (modIndex, lessonIndex) => {
+    const updated = [...courseData.modules];
+    updated[modIndex].lessons.splice(lessonIndex, 1);
+    setCourseData({ ...courseData, modules: updated });
+  };
+
+  const handleUpdateLesson = (modIndex, lessonIndex, field, value) => {
+    const updated = [...courseData.modules];
+    updated[modIndex].lessons[lessonIndex][field] = value;
+    setCourseData({ ...courseData, modules: updated });
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+    setIsUploadingImage(true);
+
+    try {
+      const response = await api.post('/lms/courses/upload-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setCourseData({ ...courseData, image_url: response.data.url });
+      alert('Image uploaded successfully!');
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to upload image. Please try again.');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ height: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -456,6 +557,7 @@ const LMS = () => {
 
       {activeTab === 'courses' && (
         <>
+          {!isAccountant && (
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               className="btn-primary"
@@ -467,9 +569,10 @@ const LMS = () => {
               + Add New Course
             </button>
           </div>
+          )}
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
             {courses.map((course) => (
-              <CourseCard key={course.id} course={course} onEdit={openEditCourse} />
+              <CourseCard key={course.id} course={course} onEdit={isAccountant ? () => {} : openEditCourse} readOnly={isAccountant} />
             ))}
           </div>
         </>
@@ -512,14 +615,16 @@ const LMS = () => {
               </select>
             </div>
 
+            {!isAccountant && (
             <button className="btn-primary" onClick={() => setIsBatchModalOpen(true)}>
               + Create New Batch
             </button>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
             {filteredBatches.map((batch) => (
-              <BatchCard key={batch.id} batch={batch} onManage={openManageBatch} />
+              <BatchCard key={batch.id} batch={batch} onManage={openManageBatch} readOnly={isAccountant} />
             ))}
           </div>
 
@@ -611,7 +716,7 @@ const LMS = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={isManageBatchModalOpen} onClose={() => setIsManageBatchModalOpen(false)} title="Batch Management">
+      <Modal isOpen={isManageBatchModalOpen} onClose={() => setIsManageBatchModalOpen(false)} title={isAccountant ? 'Batch Details' : 'Batch Management'}>
         {manageBatchData && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '75vh', overflowY: 'auto', paddingRight: '0.5rem' }}>
             <div className="glass-morphism" style={{ padding: '1rem', border: '1px solid var(--border)' }}>
@@ -621,6 +726,20 @@ const LMS = () => {
               </p>
             </div>
 
+            {isAccountant ? (
+              /* ── Read-only batch info for accountants ── */
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Course</p><p style={{ margin: 0, fontSize: '0.85rem' }}>{selectedBatch?.Course?.title || 'N/A'}</p></div>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Batch Code</p><p style={{ margin: 0, fontSize: '0.85rem' }}>{manageBatchData.code}</p></div>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Batch Name</p><p style={{ margin: 0, fontSize: '0.85rem' }}>{manageBatchData.name || 'N/A'}</p></div>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Trainer</p><p style={{ margin: 0, fontSize: '0.85rem' }}>{selectedBatch?.Trainer?.name || 'N/A'}</p></div>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Schedule</p><p style={{ margin: 0, fontSize: '0.85rem' }}>{readableSchedule(manageBatchData.schedule)}</p></div>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Status</p><p style={{ margin: 0, fontSize: '0.85rem', textTransform: 'capitalize' }}>{manageBatchData.status}</p></div>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Start Date</p><p style={{ margin: 0, fontSize: '0.85rem' }}>{formatDate(manageBatchData.start_date)}</p></div>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>End Date</p><p style={{ margin: 0, fontSize: '0.85rem' }}>{formatDate(manageBatchData.end_date)}</p></div>
+                <div><p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Capacity</p><p style={{ margin: 0, fontSize: '0.85rem' }}>{manageBatchData.capacity}</p></div>
+              </div>
+            ) : (
             <form onSubmit={handleSaveBatchUpdates} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <label>Master Course</label>
@@ -699,6 +818,7 @@ const LMS = () => {
                 </button>
               </div>
             </form>
+            )}
 
             <div style={{ borderTop: '1px solid var(--border)', marginTop: '0.5rem', paddingTop: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
@@ -780,11 +900,107 @@ const LMS = () => {
             <h4 style={{ color: 'var(--primary)', margin: 0 }}>Marketing Materials</h4>
           </div>
 
-          <div className="form-group" style={{ gridColumn: 'span 2' }}><label>Thumbnail / Marketing Image URL</label><input className="glass-input" placeholder="https://example.com/assets/banner.jpg" value={courseData.image_url} onChange={(e) => setCourseData({ ...courseData, image_url: e.target.value })} /></div>
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label>Thumbnail / Marketing Image URL</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input 
+                className="glass-input" 
+                style={{ flex: 1 }} 
+                placeholder="https://example.com/assets/banner.jpg" 
+                value={courseData.image_url} 
+                onChange={(e) => setCourseData({ ...courseData, image_url: e.target.value })} 
+              />
+              <div style={{ position: 'relative', overflow: 'hidden' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  disabled={isUploadingImage}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap', height: '100%' }}
+                >
+                  {isUploadingImage ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                  {isUploadingImage ? 'Uploading...' : 'Upload File'}
+                </button>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageUpload}
+                  disabled={isUploadingImage}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} 
+                />
+              </div>
+            </div>
+            {courseData.image_url && (
+              <div style={{ marginTop: '0.8rem', borderRadius: 'var(--radius)', overflow: 'hidden', width: '200px', border: '1px solid var(--border)' }}>
+                <img src={courseData.image_url} alt="Course preview" style={{ width: '100%', height: 'auto', display: 'block' }} />
+              </div>
+            )}
+          </div>
           <div className="form-group" style={{ gridColumn: 'span 2' }}><label>Short Promotional Description (Website Tagline)</label><textarea className="glass-input" rows="3" placeholder="A compelling 1-2 sentence description explaining the value proposition of the course." value={courseData.short_description} onChange={(e) => setCourseData({ ...courseData, short_description: e.target.value })} /></div>
 
           <div className="form-group"><label>Featured Instructor Name</label><input className="glass-input" placeholder="e.g. John Doe, M.A." value={courseData.instructor_name} onChange={(e) => setCourseData({ ...courseData, instructor_name: e.target.value })} /></div>
           <div className="form-group"><label>Promo Video Embed (URL)</label><input className="glass-input" placeholder="e.g. YouTube / Vimeo link" value={courseData.instructor_video_url} onChange={(e) => setCourseData({ ...courseData, instructor_video_url: e.target.value })} /></div>
+
+          <div style={{ gridColumn: 'span 2', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', marginTop: '0.5rem' }}>
+            <h4 style={{ color: 'var(--primary)', margin: 0 }}>Detailed Course Information</h4>
+          </div>
+
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <label>Long Course Description</label>
+            <textarea className="glass-input" rows="5" placeholder="Comprehensive detailing of the course structure, target audience, and benefits." value={courseData.description || ''} onChange={(e) => setCourseData({ ...courseData, description: e.target.value })} />
+          </div>
+
+          {/* Learning Outcomes Builder */}
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <label style={{ margin: 0 }}>Learning Outcomes (What you'll achieve)</label>
+              <button type="button" onClick={handleAddOutcome} style={{ background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>+ Add Outcome</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {(!courseData.what_you_will_learn || courseData.what_you_will_learn.length === 0) && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', margin: 0 }}>No learning outcomes defined. Defaults will be shown on the website.</p>
+              )}
+              {courseData.what_you_will_learn?.map((outcome, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input className="glass-input" style={{ flex: 1 }} value={outcome} onChange={(e) => handleUpdateOutcome(idx, e.target.value)} placeholder={`e.g. Master targeted skill drills`} />
+                  <button type="button" onClick={() => handleRemoveOutcome(idx)} style={{ padding: '0 0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius)', cursor: 'pointer' }}>X</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Curriculum Builder */}
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <label style={{ margin: 0 }}>Course Curriculum (Modules & Lessons)</label>
+              <button type="button" onClick={handleAddModule} style={{ background: 'var(--primary)', border: 'none', color: 'white', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>+ Add Module</button>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {(!courseData.modules || courseData.modules.length === 0) && (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', margin: 0 }}>No curriculum defined. Default curriculum will be shown on the website.</p>
+              )}
+              {courseData.modules?.map((module, mIdx) => (
+                <div key={mIdx} style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', background: 'var(--primary-glow)', color: 'var(--primary)', borderRadius: '8px', fontWeight: 'bold' }}>{mIdx + 1}</div>
+                    <input className="glass-input" style={{ flex: 1 }} value={module.title} onChange={(e) => handleUpdateModuleTitle(mIdx, e.target.value)} placeholder="Module Title (e.g. Orientation & Foundation)" />
+                    <button type="button" onClick={() => handleRemoveModule(mIdx)} style={{ padding: '0 0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius)', cursor: 'pointer' }}>Remove Module</button>
+                  </div>
+                  
+                  <div style={{ paddingLeft: '2.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {module.lessons?.map((lesson, lIdx) => (
+                      <div key={lIdx} style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input className="glass-input" style={{ flex: 2, padding: '0.5rem 1rem' }} value={lesson.title} onChange={(e) => handleUpdateLesson(mIdx, lIdx, 'title', e.target.value)} placeholder="Lesson Title" />
+                        <input className="glass-input" style={{ flex: 1, padding: '0.5rem 1rem' }} value={lesson.duration} onChange={(e) => handleUpdateLesson(mIdx, lIdx, 'duration', e.target.value)} placeholder="Duration (e.g. 45m)" />
+                        <button type="button" onClick={() => handleRemoveLesson(mIdx, lIdx)} style={{ padding: '0 0.6rem', background: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }}>X</button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => handleAddLesson(mIdx)} style={{ width: 'fit-content', background: 'transparent', border: '1px dashed var(--border)', color: 'var(--text-dim)', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.75rem', cursor: 'pointer', marginTop: '0.5rem' }}>+ Add Lesson</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="form-group" style={{ gridColumn: 'span 2', marginTop: '1.5rem' }}>
             <button type="submit" className="btn-primary" disabled={submitting} style={{ width: '100%', padding: '1rem', fontSize: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>

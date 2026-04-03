@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, TrendingUp, TrendingDown, Receipt, AlertTriangle, DollarSign, FileText, PieChart } from 'lucide-react';
 import api from '../services/api';
+import QuickCheckIn from '../components/QuickCheckIn';
 import '../styles/GlobalStyles.css';
 
 const KPICard = ({ label, value, subtitle, color, borderColor }) => (
@@ -57,6 +58,8 @@ const FinanceHub = () => {
           <button className="btn-primary" style={{ fontSize: '0.8rem', background: '#ef4444' }}>📄 PDF Report</button>
         </div>
       </div>
+
+      <QuickCheckIn />
 
       {/* KPI Row 1 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>

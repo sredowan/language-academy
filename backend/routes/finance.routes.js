@@ -10,6 +10,7 @@ router.use(branchMiddleware);
 router.post('/expense', financeController.recordExpense);
 router.get('/stats', financeController.getFinanceStats);
 router.get('/overview', financeController.getOverview);
+router.get('/report-suite', financeController.getReportSuite);
 router.get('/profit-loss', financeController.getProfitLoss);
 router.get('/trial-balance', financeController.getTrialBalance);
 router.get('/cashflow', financeController.getCashFlow);

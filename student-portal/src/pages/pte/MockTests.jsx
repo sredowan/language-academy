@@ -66,7 +66,7 @@ const MockTests = () => {
         </button>
         <div>
           <h1 className="text-3xl font-black">Mock Test System</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">Test your readiness with real-time exam simulations.</p>
+          <p className="text-[var(--text-dim)] mt-1 font-medium">Test your readiness with real-time exam simulations.</p>
         </div>
       </div>
 
@@ -77,17 +77,17 @@ const MockTests = () => {
            {mocks.map((mock) => (
              <div 
                key={mock.id}
-               className={`bg-white dark:bg-gray-800 rounded-3xl p-8 border hover:border-indigo-600/30 transition-all shadow-sm flex flex-col md:flex-row items-center justify-between gap-8 group ${mock.isPremium && !isPremium ? 'opacity-80' : ''}`}
+               className={`glass-morphism rounded-3xl p-8 border hover:border-indigo-600/30 transition-all shadow-sm flex flex-col md:flex-row items-center justify-between gap-8 group ${mock.isPremium && !isPremium ? 'opacity-80' : ''}`}
              >
                 <div className="flex-1 space-y-3">
                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl text-indigo-600">
+                      <div className="p-3 bg-[var(--glass)] dark:bg-indigo-900/20 rounded-2xl text-[var(--primary)]">
                          <Trophy className="w-6 h-6" />
                       </div>
                       <h3 className="text-xl font-black">{mock.title}</h3>
                       {mock.isPremium && !isPremium && <Lock className="w-4 h-4 text-gray-400" />}
                    </div>
-                   <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">{mock.desc}</p>
+                   <p className="text-sm text-[var(--text-dim)] leading-relaxed font-medium">{mock.desc}</p>
                    <div className="flex items-center gap-4">
                       <div className="flex items-center gap-1.5 text-xs text-gray-400 font-bold">
                          <Clock className="w-3.5 h-3.5" /> {mock.duration}
@@ -101,13 +101,13 @@ const MockTests = () => {
                 {mock.isPremium && !isPremium ? (
                   <button 
                     onClick={() => navigate('/subscription')}
-                    className="w-full md:w-auto px-10 py-4 bg-gray-100 dark:bg-gray-700 text-gray-500 font-black rounded-2xl hover:bg-indigo-600 hover:text-white transition-all text-sm uppercase tracking-wider"
+                    className="w-full md:w-auto px-10 py-4 bg-gray-100 dark:bg-gray-700 text-gray-500 font-black rounded-2xl hover:bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white hover:text-white transition-all text-sm uppercase tracking-wider"
                   >
                     Unlock Mock
                   </button>
                 ) : (
                   <button 
-                    className="w-full md:w-auto px-10 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-600/20 hover:scale-105 transition-all active:scale-95 flex items-center justify-center gap-2 group"
+                    className="w-full md:w-auto px-10 py-4 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-black rounded-2xl shadow-xl shadow-indigo-600/20 hover:scale-105 transition-all active:scale-95 flex items-center justify-center gap-2 group"
                   >
                     <Play className="w-4 h-4 fill-white" /> Start Mock
                   </button>
@@ -138,9 +138,9 @@ const MockTests = () => {
               </div>
            </div>
 
-           <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
+           <div className="glass-morphism rounded-3xl p-6 border border-[var(--border)] border-[var(--border)] shadow-sm">
               <h3 className="font-black text-sm mb-4 uppercase tracking-widest text-gray-400">Mock History</h3>
-              {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto my-4 text-indigo-600" /> : (
+              {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto my-4 text-[var(--primary)]" /> : (
                 <div className="space-y-4">
                    {history.length > 0 ? history.map((item, i) => (
                      <div key={i} className="flex items-center justify-between group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 p-2 rounded-xl transition-all">
@@ -153,10 +153,10 @@ const MockTests = () => {
                               <p className="text-[10px] text-gray-400">{new Date(item.created_at).toLocaleDateString()}</p>
                            </div>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-600" />
+                        <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-[var(--primary)]" />
                      </div>
                    )) : (
-                     <div className="py-8 text-center border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-2xl">
+                     <div className="py-8 text-center border-2 border-dashed border-[var(--border)] border-[var(--border)] rounded-2xl">
                         <p className="text-xs text-gray-400 font-medium italic">No mock attempts found.</p>
                      </div>
                    )}

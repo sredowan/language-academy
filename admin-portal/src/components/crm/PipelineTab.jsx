@@ -1,21 +1,42 @@
-import React, { useState } from 'react';
-import { Search, Plus, Phone, Mail, X, ChevronRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Search, Plus, Phone, Mail, X, ChevronRight, Trash2 } from 'lucide-react';
 import api from '../../services/api';
 import { ScoreBadge, PriorityBadge, stageColors, stageLabels, stageIcons, actIcons, inputStyle } from './CRMComponents';
 
 const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
+  const createEnrollmentForm = (sourceLead, batchId = '') => ({
+    course_id: sourceLead?.course_id || '',
+    batch_id: batchId || '',
+    first_name: sourceLead?.name?.split(' ')[0] || '',
+    last_name: sourceLead?.name?.split(' ').slice(1).join(' ') || '',
+    mobile_no: sourceLead?.phone || '',
+    email: sourceLead?.email || '',
+    password: '',
+    father_name: '',
+    mother_name: '',
+    current_address: '',
+    permanent_address: '',
+    nid_birth_cert: '',
+    educational_details: [
+      { exam_name: 'SSC', institution_name: '', passing_year: '', result: '' },
+      { exam_name: 'HSC', institution_name: '', passing_year: '', result: '' }
+    ],
+    employment_details: ''
+  });
+
   const [activities, setActivities] = useState([]);
   const [actForm, setActForm] = useState({ type: 'call', subject: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   const [loadedActs, setLoadedActs] = useState(false);
+  const [showEnrollForm, setShowEnrollForm] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState('');
+  const [enrollForm, setEnrollForm] = useState(createEnrollmentForm(lead));
 
   if (!loadedActs && lead) {
     api.get(`/crm/activities?lead_id=${lead.id}`).then(r => setActivities(r.data)).catch(() => {});
     setLoadedActs(true);
   }
-
-  if (!lead) return null;
 
   const logActivity = async (e) => {
     e.preventDefault(); setSaving(true);
@@ -32,13 +53,62 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
     catch { alert('Failed'); }
   };
 
-  const [selectedBatch, setSelectedBatch] = useState('');
+  useEffect(() => {
+    setSelectedBatch('');
+    setShowEnrollForm(false);
+    setEnrollForm(createEnrollmentForm(lead));
+  }, [lead?.id]);
 
-  const handleEnroll = async () => {
+  useEffect(() => {
+    setEnrollForm(prev => ({
+      ...prev,
+      course_id: lead?.course_id || '',
+      batch_id: selectedBatch || prev.batch_id || ''
+    }));
+  }, [lead?.course_id, selectedBatch]);
+
+  if (!lead) return null;
+
+  const handleEnrollInputChange = (e) => {
+    const { name, value } = e.target;
+    setEnrollForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleEducationChange = (index, field, value) => {
+    setEnrollForm(prev => ({
+      ...prev,
+      educational_details: prev.educational_details.map((item, itemIndex) => (
+        itemIndex === index ? { ...item, [field]: value } : item
+      ))
+    }));
+  };
+
+  const addEducationRow = () => {
+    setEnrollForm(prev => ({
+      ...prev,
+      educational_details: [...prev.educational_details, { exam_name: '', institution_name: '', passing_year: '', result: '' }]
+    }));
+  };
+
+  const removeEducationRow = (index) => {
+    setEnrollForm(prev => ({
+      ...prev,
+      educational_details: prev.educational_details.filter((_, itemIndex) => itemIndex !== index)
+    }));
+  };
+
+  const handleEnroll = async (e) => {
+    e?.preventDefault();
     if (!lead.course_id) return alert('Please select a course for this lead first.');
     setEnrolling(true);
     try {
-      const r = await api.post(`/crm/leads/${lead.id}/enroll`, { course_id: lead.course_id, batch_id: selectedBatch || undefined });
+      const payload = {
+        ...enrollForm,
+        course_id: lead.course_id,
+        batch_id: selectedBatch || enrollForm.batch_id || undefined,
+        name: `${enrollForm.first_name} ${enrollForm.last_name}`.trim() || lead.name
+      };
+      const r = await api.post(`/crm/leads/${lead.id}/enroll`, payload);
       alert(`✅ ${r.data.message}`);
       onRefresh(); onClose();
     } catch (err) { alert(err.response?.data?.error || 'Failed to enroll'); }
@@ -52,8 +122,8 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
 
   const selectedCourse = courses.find(c => c.id === lead.course_id);
 
-  const statusFlow = ['new', 'contacted', 'interested', 'trial', 'enrolled', 'fees_pending', 'successful'];
-  const daysAge = Math.floor((Date.now() - new Date(lead.created_at)) / 86400000);
+  const statusFlow = ['new', 'contacted', 'interested', 'trial', 'enrolled', 'fees_pending', 'payment_rejected', 'successful'];
+  const daysAge = Math.floor((Date.now() - new Date(lead.createdAt || lead.created_at)) / 86400000);
 
   return (
     <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '440px', background: 'var(--bg-card)', borderLeft: '1px solid var(--border)', zIndex: 500, overflowY: 'auto', boxShadow: '-10px 0 40px rgba(0,0,0,0.4)' }}>
@@ -115,19 +185,103 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexDirection: 'column' }}>
-          {!['fees_pending', 'successful', 'lost'].includes(lead.status) && (
-            <button onClick={handleEnroll} disabled={enrolling || !lead.course_id} style={{ padding: '0.6rem', background: lead.course_id ? '#06b6d4' : '#6b7280', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem', cursor: lead.course_id ? 'pointer' : 'not-allowed', opacity: lead.course_id ? 1 : 0.6 }}>
-              {enrolling ? '...' : '📝 Enroll → Create Invoice for POS'}
-            </button>
-          )}
-          {lead.status === 'fees_pending' && (
-            <div style={{ padding: '0.8rem', background: '#f59e0b10', border: '1px solid #f59e0b30', borderRadius: '8px' }}>
-              <p style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: '700', marginBottom: '0.3rem' }}>⏳ Waiting for Fee Collection</p>
-              <p style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Go to <strong>Finance → POS</strong> to collect fees. Student will be auto-created and this lead will be marked successful once fees are collected.</p>
-            </div>
-          )}
-          {lead.status === 'successful' && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexDirection: 'column' }}>
+            {!['fees_pending', 'payment_rejected', 'successful', 'lost'].includes(lead.status) && (
+              <button onClick={() => setShowEnrollForm(prev => !prev)} disabled={!lead.course_id} style={{ padding: '0.6rem', background: lead.course_id ? '#06b6d4' : '#6b7280', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem', cursor: lead.course_id ? 'pointer' : 'not-allowed', opacity: lead.course_id ? 1 : 0.6 }}>
+                {showEnrollForm ? 'Hide Enrollment Form' : '📝 Enroll → Add Student Details'}
+              </button>
+            )}
+            {showEnrollForm && !['fees_pending', 'payment_rejected', 'successful', 'lost'].includes(lead.status) && (
+              <form onSubmit={handleEnroll} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem', background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>First Name *</label>
+                    <input required name="first_name" value={enrollForm.first_name} onChange={handleEnrollInputChange} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Last Name *</label>
+                    <input required name="last_name" value={enrollForm.last_name} onChange={handleEnrollInputChange} style={inputStyle} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Mobile *</label>
+                    <input required name="mobile_no" value={enrollForm.mobile_no} onChange={handleEnrollInputChange} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Email</label>
+                    <input type="email" name="email" value={enrollForm.email} onChange={handleEnrollInputChange} style={inputStyle} placeholder="Optional" />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Password</label>
+                    <input type="password" name="password" value={enrollForm.password} onChange={handleEnrollInputChange} style={inputStyle} placeholder="Default set if blank" />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>NID / Birth Cert</label>
+                    <input name="nid_birth_cert" value={enrollForm.nid_birth_cert} onChange={handleEnrollInputChange} style={inputStyle} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Father's Name</label>
+                    <input name="father_name" value={enrollForm.father_name} onChange={handleEnrollInputChange} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Mother's Name</label>
+                    <input name="mother_name" value={enrollForm.mother_name} onChange={handleEnrollInputChange} style={inputStyle} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Current Address</label>
+                  <textarea name="current_address" value={enrollForm.current_address} onChange={handleEnrollInputChange} style={{ ...inputStyle, minHeight: '56px', resize: 'vertical' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Permanent Address</label>
+                  <textarea name="permanent_address" value={enrollForm.permanent_address} onChange={handleEnrollInputChange} style={{ ...inputStyle, minHeight: '56px', resize: 'vertical' }} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Education Details</label>
+                    <button type="button" onClick={addEducationRow} style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.75rem' }}>+ Add Row</button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {enrollForm.educational_details.map((row, index) => (
+                      <div key={`${row.exam_name || 'ed'}-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 0.8fr 0.8fr auto', gap: '0.4rem', alignItems: 'center' }}>
+                        <input value={row.exam_name} onChange={(e) => handleEducationChange(index, 'exam_name', e.target.value)} placeholder="Exam" style={inputStyle} />
+                        <input value={row.institution_name} onChange={(e) => handleEducationChange(index, 'institution_name', e.target.value)} placeholder="Institution" style={inputStyle} />
+                        <input value={row.passing_year} onChange={(e) => handleEducationChange(index, 'passing_year', e.target.value)} placeholder="Year" style={inputStyle} />
+                        <input value={row.result} onChange={(e) => handleEducationChange(index, 'result', e.target.value)} placeholder="Result" style={inputStyle} />
+                        <button type="button" onClick={() => removeEducationRow(index)} disabled={enrollForm.educational_details.length === 1} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: enrollForm.educational_details.length === 1 ? 'not-allowed' : 'pointer', opacity: enrollForm.educational_details.length === 1 ? 0.4 : 1 }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.3rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>Employment Details</label>
+                  <textarea name="employment_details" value={enrollForm.employment_details} onChange={handleEnrollInputChange} style={{ ...inputStyle, minHeight: '56px', resize: 'vertical' }} placeholder="Job title, company, duration" />
+                </div>
+                <button type="submit" disabled={enrolling} style={{ padding: '0.7rem', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: enrolling ? 'wait' : 'pointer' }}>
+                  {enrolling ? 'Creating student and invoice...' : 'Create Student + Enrollment + POS Invoice'}
+                </button>
+              </form>
+            )}
+            {lead.status === 'fees_pending' && (
+              <div style={{ padding: '0.8rem', background: '#f59e0b10', border: '1px solid #f59e0b30', borderRadius: '8px' }}>
+                <p style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: '700', marginBottom: '0.3rem' }}>⏳ Waiting for Fee Collection</p>
+              <p style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Go to <strong>Finance → POS</strong> to collect fees. Student profile is already created and the lead will move to successful once the invoice is fully paid.</p>
+              </div>
+            )}
+            {lead.status === 'payment_rejected' && (
+              <div style={{ padding: '0.8rem', background: '#ef444410', border: '1px solid #ef444430', borderRadius: '8px' }}>
+                <p style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '700', marginBottom: '0.3rem' }}>Payment Rejected</p>
+                <p style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>This lead was rejected during fee collection and the enrollment has been cancelled.</p>
+              </div>
+            )}
+            {lead.status === 'successful' && (
             <div style={{ padding: '0.8rem', background: '#10b98110', border: '1px solid #10b98130', borderRadius: '8px' }}>
               <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '700' }}>🏆 Sale Complete — Student Created & Fees Collected</p>
             </div>
@@ -166,7 +320,7 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
               <div key={a.id} style={{ padding: '0.6rem 0.8rem', background: 'var(--glass)', borderRadius: '8px', borderLeft: `3px solid ${a.is_done ? '#10b981' : 'var(--primary)'}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '0.78rem', fontWeight: '600' }}>{actIcons[a.type]} {a.subject}</span>
-                  <span style={{ fontSize: '0.6rem', color: 'var(--text-dim)' }}>{new Date(a.created_at).toLocaleDateString()}</span>
+                  <span style={{ fontSize: '0.6rem', color: 'var(--text-dim)' }}>{new Date(a.createdAt || a.created_at).toLocaleDateString()}</span>
                 </div>
                 {a.description && <p style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '0.2rem' }}>{a.description}</p>}
               </div>
@@ -180,7 +334,7 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
 
 const LeadCard = ({ lead, onClick }) => {
   const daysSince = lead.last_activity_at ? Math.floor((Date.now() - new Date(lead.last_activity_at)) / 86400000) : null;
-  const daysAge = Math.floor((Date.now() - new Date(lead.created_at)) / 86400000);
+  const daysAge = Math.floor((Date.now() - new Date(lead.createdAt || lead.created_at)) / 86400000);
 
   return (
     <div onClick={() => onClick(lead)} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '10px', padding: '0.9rem', marginBottom: '0.5rem', cursor: 'pointer', transition: 'all 0.15s', borderLeft: `3px solid ${stageColors[lead.status]}` }}
@@ -217,6 +371,7 @@ const PipelineTab = ({ leads, courses, onRefresh }) => {
     { key: 'trial', label: 'Trial Class', desc: 'Demo/trial booked' },
     { key: 'enrolled', label: 'Enrolled', desc: 'Course & batch selected' },
     { key: 'fees_pending', label: 'Fees Pending', desc: 'Collect via POS' },
+    { key: 'payment_rejected', label: 'Payment Rejected', desc: 'Rejected at payment step' },
     { key: 'successful', label: 'Successful', desc: 'Fees collected · Student created' },
   ];
 

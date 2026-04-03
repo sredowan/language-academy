@@ -5,7 +5,13 @@ export default defineConfig({
   plugins: [react()],
   base: '/teacher/',
   server: {
+    host: '127.0.0.1',
     port: 5175,
     strictPort: true,
+    hmr: {
+      protocol: 'ws',
+      host: '127.0.0.1',
+      port: 5175,
+    }
   }
 })

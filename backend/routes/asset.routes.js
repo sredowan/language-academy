@@ -7,6 +7,7 @@ const { injectBranchFilter } = require('../middleware/branch.middleware');
 router.use(protect);
 router.use(injectBranchFilter);
 
+router.get('/stats', assetController.getAssetStats);
 router.get('/', assetController.getAssets);
 router.post('/', assetController.createAsset);
 router.put('/:id', assetController.updateAsset);

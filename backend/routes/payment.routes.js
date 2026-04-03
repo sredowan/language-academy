@@ -3,9 +3,14 @@ const router = express.Router();
 const paymentController = require('../controllers/payment.controller');
 const { authMiddleware } = require('../middleware/auth.middleware');
 
-router.use(authMiddleware);
+// Public endpoints
+router.post('/initiate', paymentController.initiateCheckout);
+router.post('/success', paymentController.paymentSuccess);
+router.post('/fail', paymentController.paymentFail);
+router.post('/cancel', paymentController.paymentCancel);
+router.get('/status/:reference', paymentController.paymentStatus);
 
-// Simulate payment and upgrade plan
-router.post('/simulate', paymentController.simulatePayment);
+// Simulate payment and upgrade plan (Auth required)
+router.post('/simulate', authMiddleware, paymentController.simulatePayment);
 
 module.exports = router;

@@ -30,7 +30,7 @@ const ScoreReports = () => {
     fetchPerformance();
   }, []);
 
-  if (loading) return <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-600" /></div>;
+  if (loading) return <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-[var(--primary)]" /></div>;
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-500 pb-20">
@@ -47,12 +47,12 @@ const ScoreReports = () => {
       {/* Skills Matrix */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Overall', score: performance?.overall_score || 0, color: 'text-indigo-600', bg: 'bg-indigo-100' },
+          { label: 'Overall', score: performance?.overall_score || 0, color: 'text-[var(--primary)]', bg: 'bg-indigo-100' },
           { label: 'Speaking', score: performance?.speaking_avg || 0, color: 'text-amber-600', bg: 'bg-amber-100' },
-          { label: 'Writing', score: performance?.writing_avg || 0, color: 'text-blue-600', bg: 'bg-blue-100' },
+          { label: 'Writing', score: performance?.writing_avg || 0, color: 'text-[var(--accent)]', bg: 'bg-blue-100' },
           { label: 'Reading', score: performance?.reading_avg || 0, color: 'text-emerald-600', bg: 'bg-emerald-100' },
         ].map((s, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm text-center">
+          <div key={i} className="glass-morphism p-8 rounded-3xl border border-[var(--border)] border-[var(--border)] shadow-sm text-center">
              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{s.label}</p>
              <div className={`text-5xl font-black mb-4 ${s.color}`}>{s.score}</div>
              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Across All Attempts</p>
@@ -65,13 +65,13 @@ const ScoreReports = () => {
         
         {/* Trend Analysis */}
         <div className="lg:col-span-2 space-y-8">
-           <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm min-h-[400px]">
+           <div className="glass-morphism rounded-3xl p-8 border border-[var(--border)] border-[var(--border)] shadow-sm min-h-[400px]">
               <div className="flex items-center justify-between mb-8">
                  <h3 className="text-xl font-black flex items-center gap-2">
-                    <TrendingUp className="w-6 h-6 text-indigo-600" /> Score Trend
+                    <TrendingUp className="w-6 h-6 text-[var(--primary)]" /> Score Trend
                  </h3>
                  <div className="flex gap-2">
-                    <button className="px-4 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-lg text-xs font-bold">7D</button>
+                    <button className="px-4 py-1.5 bg-[var(--glass)] dark:bg-indigo-900/20 text-[var(--primary)] rounded-lg text-xs font-bold">7D</button>
                     <button className="px-4 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg text-xs font-bold text-gray-400 transition-colors">30D</button>
                  </div>
               </div>
@@ -82,7 +82,7 @@ const ScoreReports = () => {
            </div>
 
            {/* Detailed Log */}
-           <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 border border-gray-100 dark:border-gray-700 shadow-sm">
+           <div className="glass-morphism rounded-3xl p-8 border border-[var(--border)] border-[var(--border)] shadow-sm">
               <h3 className="text-xl font-black mb-6">Attempt History</h3>
               <div className="divide-y divide-gray-50 dark:divide-gray-800">
                  {(performance?.recent_attempts || []).map((attempt, i) => (
@@ -96,13 +96,13 @@ const ScoreReports = () => {
                            {attempt.score}
                          </div>
                          <div>
-                            <p className="font-bold text-gray-900 dark:text-white uppercase text-xs">{attempt.task_type}</p>
+                            <p className="font-bold text-[var(--text-main)] uppercase text-xs">{attempt.task_type}</p>
                             <p className="text-[10px] text-gray-400 flex items-center gap-1">
                                <Calendar className="w-3 h-3" /> {new Date(attempt.created_at).toLocaleDateString()}
                             </p>
                          </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-200 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+                      <ChevronRight className="w-5 h-5 text-gray-200 group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
                    </div>
                  ))}
               </div>
@@ -111,7 +111,7 @@ const ScoreReports = () => {
 
         {/* Actionable Insights */}
         <div className="space-y-8">
-           <div className="bg-gradient-to-br from-indigo-900 to-blue-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-900/40">
+           <div className="bg-gradient-to-br from-[var(--primary)] to-blue-900 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-900/40">
               <h3 className="text-xl font-black mb-4 flex items-center gap-2">
                  <Zap className="w-6 h-6 text-yellow-500 fill-yellow-500" /> AI Coach Advice
               </h3>
@@ -127,12 +127,12 @@ const ScoreReports = () => {
                  {!isPremium ? (
                    <button 
                      onClick={() => navigate('/subscription')}
-                     className="w-full py-4 bg-yellow-400 text-indigo-900 font-black rounded-2xl hover:bg-yellow-300 transition-all text-sm uppercase"
+                     className="w-full py-4 bg-yellow-400 text-[var(--text-main)] font-black rounded-2xl hover:bg-yellow-300 transition-all text-sm uppercase"
                    >
                      Unlock Personalized Insights
                    </button>
                  ) : (
-                   <button className="w-full py-4 bg-white text-indigo-900 font-black rounded-2xl hover:bg-indigo-50 transition-all text-sm uppercase">
+                   <button className="w-full py-4 bg-white text-[var(--text-main)] font-black rounded-2xl hover:bg-[var(--glass)] transition-all text-sm uppercase">
                       Download Score Report (PDF)
                    </button>
                  )}
@@ -140,15 +140,15 @@ const ScoreReports = () => {
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
            </div>
 
-           <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 border border-gray-100 dark:border-gray-700 shadow-sm">
+           <div className="glass-morphism rounded-3xl p-6 border border-[var(--border)] border-[var(--border)] shadow-sm">
               <h3 className="font-black text-sm mb-4 uppercase tracking-widest text-gray-400">Exam Target</h3>
               <div className="space-y-4">
                  <div className="flex items-center justify-between">
                     <span className="text-sm font-bold">Goal Score</span>
-                    <span className="text-xl font-black text-indigo-600">79+</span>
+                    <span className="text-xl font-black text-[var(--primary)]">79+</span>
                  </div>
                  <div className="h-6 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden flex items-center px-1">
-                    <div className="h-4 bg-indigo-600 rounded-full flex items-center justify-center text-[10px] font-black text-white px-2" style={{ width: '85%' }}>85%</div>
+                    <div className="h-4 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-full flex items-center justify-center text-[10px] font-black text-white px-2" style={{ width: '85%' }}>85%</div>
                  </div>
                  <p className="text-[10px] text-gray-400 font-medium text-center italic">"You are 85% ready for your target exam score."</p>
               </div>

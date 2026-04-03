@@ -1,8 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const sequelize = require('./config/db.config');
 
+// Enforce globally at the system process level
+process.env.TZ = 'Asia/Dhaka';
+
+const sequelize = require('./config/db.config');
 const app = express();
 
 // Middleware
@@ -43,6 +46,9 @@ app.use('/api/budget', require('./routes/budget.routes'));
 app.use('/api/public', require('./routes/public.routes'));
 app.use('/api/payment', require('./routes/payment.routes'));
 app.use('/api/website', require('./routes/website.routes'));
+app.use('/api/hrm', require('./routes/hrm.routes'));
+app.use('/api/rbac', require('./routes/rbac.routes'));
+app.use('/api/settings', require('./routes/settings.routes'));
 
 // Default Route
 app.get('/', (req, res) => {
@@ -73,6 +79,7 @@ const ReconciliationSession = require('./models/ReconciliationSession');
 const ReconciliationLine = require('./models/ReconciliationLine');
 const ReconciliationMatch = require('./models/ReconciliationMatch');
 const ReconciliationEvent = require('./models/ReconciliationEvent');
+const LiquidityMovement = require('./models/LiquidityMovement');
 
 // Import accounting & pos models for sync
 const Transaction = require('./models/Transaction');
@@ -84,6 +91,23 @@ const BankAccountLedgerMap = require('./models/BankAccountLedgerMap');
 const Invoice = require('./models/Invoice');
 const Enrollment = require('./models/Enrollment');
 const User = require('./models/User');
+
+// HRM Models
+const StaffAttendance = require('./models/StaffAttendance');
+const LeaveType = require('./models/LeaveType');
+const LeaveRequest = require('./models/LeaveRequest');
+const LeaveBalance = require('./models/LeaveBalance');
+const JobPosting = require('./models/JobPosting');
+const Applicant = require('./models/Applicant');
+const StaffDocument = require('./models/StaffDocument');
+const PerformanceReview = require('./models/PerformanceReview');
+const Shift = require('./models/Shift');
+const StaffSchedule = require('./models/StaffSchedule');
+const StaffProfile = require('./models/StaffProfile');
+const RbacConfig = require('./models/RbacConfig');
+const SystemSetting = require('./models/SystemSetting');
+const IncomeCategory = require('./models/IncomeCategory');
+const Customer = require('./models/Customer');
 
 // ─── MODEL ASSOCIATIONS (Centralized to avoid circularity) ──────────────────
 ReconciliationSession.hasMany(ReconciliationLine, { foreignKey: 'session_id' });
@@ -113,33 +137,28 @@ JournalLine.belongsTo(Account, { foreignKey: 'account_id' });
 sequelize.authenticate()
   .then(() => {
     console.log('Database connected...');
-    // Sync only specific tables that may be missing
-    return Promise.all([
-      User.sync({ alter: true }), // Critical to sync first
-      ExpenseCategory.sync({ alter: true }),
-      Expense.sync({ alter: true }),
-      Lead.sync({ alter: true }),
-      Contact.sync({ alter: true }),
-      Opportunity.sync({ alter: true }),
-      Activity.sync({ alter: true }),
-      CampaignTemplate.sync({ alter: true }),
-      Student.sync({ alter: true }),
-      PteTask.sync({ alter: true }),
-      Course.sync({ alter: true }),
-      Batch.sync({ alter: true }),
-      Account.sync({ alter: true }),
-      BankAccount.sync({ alter: true }),
-      BankAccountLedgerMap.sync({ alter: true }),
-      Invoice.sync({ alter: true }),
-      Enrollment.sync({ alter: true }),
-      Transaction.sync({ alter: true }),
-      JournalEntry.sync({ alter: true }),
-      JournalLine.sync({ alter: true }),
-      ReconciliationSession.sync({ alter: true }),
-      ReconciliationLine.sync({ alter: true }),
-      ReconciliationMatch.sync({ alter: true }),
-      ReconciliationEvent.sync({ alter: true }),
-    ]);
+    // Sync tables — errors are caught per-table so one failure doesn't block startup
+    const models = [
+      User, ExpenseCategory, Expense, Lead, Contact, Opportunity, Activity,
+      CampaignTemplate, Student, PteTask, Course, Batch, Account, BankAccount,
+      BankAccountLedgerMap, Invoice, Enrollment, Transaction, JournalEntry,
+      JournalLine, ReconciliationSession, ReconciliationLine,
+      ReconciliationMatch, ReconciliationEvent, LiquidityMovement,
+      StaffAttendance, LeaveType, LeaveRequest, LeaveBalance,
+      JobPosting, Applicant, StaffDocument, PerformanceReview,
+      Shift, StaffSchedule, StaffProfile, RbacConfig, SystemSetting,
+      IncomeCategory, Customer,
+    ];
+    return Promise.allSettled(
+      models.map(m => m.sync({ alter: true }).catch(err => {
+        console.warn(`  ⚠ Sync warning for ${m.name}: ${err.message.substring(0, 80)}`);
+      }))
+    );
+  })
+  .then(() => {
+    // Initialize required defaults like Settings
+    const settingsController = require('./controllers/settings.controller');
+    return settingsController.initializeDefaults().catch(err => console.error('Error initializing settings:', err));
   })
   .then(() => {
     app.listen(PORT, () => {
@@ -148,4 +167,6 @@ sequelize.authenticate()
   })
   .catch(err => {
     console.error('Database connection error:', err);
+    process.exit(1);
   });
+

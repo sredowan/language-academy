@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, Loader2 } from 'lucide-react';
 import '../styles/GlobalStyles.css';
+import api from '../services/api';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('admin@renetech.com');
@@ -18,11 +18,15 @@ const LoginPage = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password });
       login(response.data.user, response.data.token);
-      navigate('/dashboard');
+      navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please check credentials.');
+      if (!err.response) {
+        setError('Cannot reach the backend at port 5000. Start the API server and try again.');
+      } else {
+        setError(err.response?.data?.error || 'Login failed. Please check credentials.');
+      }
     } finally {
       setLoading(false);
     }

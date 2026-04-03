@@ -9,6 +9,8 @@ router.use(branchMiddleware);
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 router.get('/stats', recon.getStats);
+router.get('/dashboard', recon.getLiquidityDashboard);
+router.get('/reports', recon.getLiquidityReports);
 
 // ─── Bank Accounts (compatibility) ────────────────────────────────────────────
 router.get('/accounts', recon.getBankAccounts);
@@ -21,6 +23,10 @@ router.delete('/mappings/:id', recon.deleteMapping);
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 router.post('/generate', recon.generateSession);
+router.post('/opening-balance', recon.recordOpeningBalance);
+router.post('/collections', recon.recordCollection);
+router.post('/transfers', recon.recordTransfer);
+router.post('/closing-balance', recon.recordClosingBalance);
 router.get('/sessions', recon.getSessions);
 router.get('/sessions/:id', recon.getSessionDetail);
 router.post('/sessions/:id/review', recon.reviewSession);

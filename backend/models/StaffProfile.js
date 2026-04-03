@@ -59,6 +59,40 @@ const StaffProfile = sequelize.define('StaffProfile', {
   work_experience: {
     type: DataTypes.JSON,
   },
+  joining_date: {
+    type: DataTypes.DATEONLY,
+  },
+  phone: {
+    type: DataTypes.STRING(50),
+  },
+  emergency_contact: {
+    type: DataTypes.STRING,
+  },
+  blood_group: {
+    type: DataTypes.STRING(5),
+  },
+  nid_number: {
+    type: DataTypes.STRING(20),
+  },
+  date_of_birth: {
+    type: DataTypes.DATEONLY,
+  },
+  gender: {
+    type: DataTypes.ENUM('male', 'female', 'other'),
+  },
+  marital_status: {
+    type: DataTypes.ENUM('single', 'married', 'divorced', 'widowed'),
+  },
+  profile_photo: {
+    type: DataTypes.STRING(500),
+  },
+  reports_to: {
+    type: DataTypes.INTEGER,
+    references: { model: User, key: 'id' },
+  },
+  department: {
+    type: DataTypes.STRING,
+  },
 }, {
   tableName: 'staff_profiles',
   underscored: true,
@@ -66,5 +100,6 @@ const StaffProfile = sequelize.define('StaffProfile', {
 
 StaffProfile.belongsTo(User, { foreignKey: 'user_id' });
 StaffProfile.belongsTo(Branch, { foreignKey: 'branch_id' });
+User.hasOne(StaffProfile, { foreignKey: 'user_id' });
 
 module.exports = StaffProfile;

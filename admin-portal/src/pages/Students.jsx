@@ -12,7 +12,9 @@ import {
   Crown,
   UserCircle
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Modal from '../components/Modal';
 import AddStudentModal from '../components/AddStudentModal';
 import '../styles/GlobalStyles.css';
@@ -34,6 +36,8 @@ const formatDate = (value) => {
 
 const getDerivedState = (student) => {
   if (student.status === 'dropped') return 'dropped';
+  if ((student.rejected_fees || []).length > 0) return 'payment_rejected';
+  if (['pending', 'partial', 'overdue'].includes(student.fee_summary?.status) && Number(student.fee_summary?.due || 0) > 0) return 'fees_pending';
   if (!student.Batch) return 'unassigned';
 
   const end = toDateOnly(student.Batch.end_date);
@@ -43,6 +47,8 @@ const getDerivedState = (student) => {
 };
 
 const stateLabel = {
+  fees_pending: 'Fees Pending',
+  payment_rejected: 'Rejected Payment',
   enrolled: 'Enrolled',
   course_completed: 'Course Completed',
   dropped: 'Dropped',
@@ -50,6 +56,8 @@ const stateLabel = {
 };
 
 const stateStyle = {
+  fees_pending: { bg: 'rgba(249,115,22,0.16)', color: '#f97316', border: '#f97316' },
+  payment_rejected: { bg: 'rgba(239,68,68,0.16)', color: '#ef4444', border: '#ef4444' },
   enrolled: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '#3b82f6' },
   course_completed: { bg: 'rgba(16,185,129,0.15)', color: '#10b981', border: '#10b981' },
   dropped: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '#ef4444' },
@@ -57,6 +65,10 @@ const stateStyle = {
 };
 
 const Students = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAccountant = ['accounting', 'accounts'].includes(user?.role);
+  const [activeTab, setActiveTab] = useState('all_students');
   const [students, setStudents] = useState([]);
   const [batches, setBatches] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -69,12 +81,13 @@ const Students = () => {
   const [premiumFilter, setPremiumFilter] = useState('all');
 
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [newStudentData, setNewStudentData] = useState({ name: '', email: '', mobile_no: '', batch_id: '', course_id: '' });
   const [isAdding, setIsAdding] = useState(false);
   const [rowSavingId, setRowSavingId] = useState(null);
   const [batchDrafts, setBatchDrafts] = useState({});
+  const [successForm, setSuccessForm] = useState({ final_course_result: '', success_destination_country: '', success_notes: '' });
 
   const fetchData = async () => {
     setLoading(true);
@@ -119,6 +132,11 @@ const Students = () => {
 
   const filteredStudents = useMemo(() => {
     return enrichedStudents.filter((student) => {
+      // Accountants can only see enrolled / fees_pending / course_completed students
+      if (isAccountant) {
+        if (!['enrolled', 'fees_pending', 'course_completed'].includes(student.derivedState)) return false;
+      }
+
       const query = searchTerm.toLowerCase();
       const matchSearch =
         (student.User?.name || '').toLowerCase().includes(query) ||
@@ -132,10 +150,15 @@ const Students = () => {
 
       return matchSearch && matchBatch && matchCourse && matchState && matchPremium;
     });
-  }, [enrichedStudents, searchTerm, batchFilter, courseFilter, stateFilter, premiumFilter]);
+  }, [enrichedStudents, searchTerm, batchFilter, courseFilter, stateFilter, premiumFilter, isAccountant]);
+
+  const successRecordStudents = useMemo(() => {
+    return enrichedStudents.filter((student) => student.derivedState === 'course_completed' || student.has_success_record);
+  }, [enrichedStudents]);
 
   const metrics = useMemo(() => ({
     total: enrichedStudents.length,
+    feesPending: enrichedStudents.filter((s) => s.derivedState === 'fees_pending').length,
     enrolled: enrichedStudents.filter((s) => s.derivedState === 'enrolled').length,
     completed: enrichedStudents.filter((s) => s.derivedState === 'course_completed').length,
     premium: enrichedStudents.filter((s) => s.isPremium).length
@@ -173,11 +196,39 @@ const Students = () => {
       const response = await api.post('/students', submissionData);
       setStudents([response.data.student, ...students]);
       setIsAddModalOpen(false);
+      if (response.data.invoice) {
+        alert('Student added with Fees Pending. Collect the admission fee from POS & Fees to complete enrollment.');
+      }
       fetchData(); // refresh to get enriched data
     } catch (error) {
       alert(error.response?.data?.error || 'Failed to add student');
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const openSuccessModal = (student) => {
+    setSelectedStudent(student);
+    setSuccessForm({
+      final_course_result: student.final_course_result || '',
+      success_destination_country: student.success_destination_country || '',
+      success_notes: student.success_notes || ''
+    });
+    setIsSuccessModalOpen(true);
+  };
+
+  const handleSaveSuccessRecord = async () => {
+    if (!selectedStudent) return;
+    setRowSavingId(selectedStudent.id);
+    try {
+      const response = await api.patch(`/students/${selectedStudent.id}/success-record`, successForm);
+      setStudents((prev) => prev.map((item) => (item.id === selectedStudent.id ? response.data : item)));
+      setSelectedStudent(response.data);
+      setIsSuccessModalOpen(false);
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to save success record');
+    } finally {
+      setRowSavingId(null);
     }
   };
 
@@ -193,19 +244,58 @@ const Students = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', margin: 0 }}>Detailed Student Management</h2>
-          <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem', margin: '0.2rem 0 0 0' }}>Batch-based progress, premium tracking, and profile-level management</p>
+          <h2 style={{ fontSize: '1.5rem', margin: 0 }}>
+            {isAccountant ? 'Enrolled Students & Billing' : 'Detailed Student Management'}
+          </h2>
+          <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem', margin: '0.2rem 0 0 0' }}>
+            {isAccountant
+              ? 'View enrolled students with fee status and billing information'
+              : 'Batch-based progress, premium tracking, and profile-level management'}
+          </p>
         </div>
-        <button className="btn-primary" onClick={() => setIsAddModalOpen(true)}>+ Add New Student</button>
+        {!isAccountant && (
+          <button className="btn-primary" onClick={() => setIsAddModalOpen(true)}>+ Add New Student</button>
+        )}
       </div>
+
+      {!isAccountant && (
+      <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--glass)', padding: '0.35rem', borderRadius: '12px', width: 'fit-content', border: '1px solid var(--border)' }}>
+        {[
+          { id: 'all_students', label: 'All Students' },
+          { id: 'success_records', label: 'Success Records' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.55rem 1.1rem',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.82rem',
+              fontWeight: '600',
+              background: activeTab === tab.id ? 'var(--primary)' : 'transparent',
+              color: activeTab === tab.id ? '#000' : 'var(--text-dim)'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '1rem' }}>
         <div className="glass-morphism" style={{ padding: '1rem' }}><Users size={16} /><h3 style={{ margin: '0.4rem 0 0 0' }}>{metrics.total}</h3><p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Total Students</p></div>
+        <div className="glass-morphism" style={{ padding: '1rem' }}><Loader2 size={16} color="#f97316" /><h3 style={{ margin: '0.4rem 0 0 0' }}>{metrics.feesPending}</h3><p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Fees Pending</p></div>
         <div className="glass-morphism" style={{ padding: '1rem' }}><BookOpen size={16} /><h3 style={{ margin: '0.4rem 0 0 0' }}>{metrics.enrolled}</h3><p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Currently Enrolled</p></div>
         <div className="glass-morphism" style={{ padding: '1rem' }}><CheckCircle2 size={16} /><h3 style={{ margin: '0.4rem 0 0 0' }}>{metrics.completed}</h3><p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Course Completed</p></div>
         <div className="glass-morphism" style={{ padding: '1rem' }}><Crown size={16} /><h3 style={{ margin: '0.4rem 0 0 0' }}>{metrics.premium}</h3><p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Premium PTE</p></div>
       </div>
 
+      {activeTab === 'all_students' && (
       <div className="glass-morphism" style={{ padding: '1rem', display: 'grid', gridTemplateColumns: '2fr repeat(4, 1fr)', gap: '0.8rem', alignItems: 'center' }}>
         <div style={{ position: 'relative' }}>
           <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
@@ -227,13 +317,24 @@ const Students = () => {
           {courses.map((course) => <option key={course.id} value={String(course.id)}>{course.title}</option>)}
         </select>
 
-        <select className="glass-input" value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.7rem' }}>
-          <option value="all">All States</option>
-          <option value="enrolled">Enrolled</option>
-          <option value="course_completed">Course Completed</option>
-          <option value="dropped">Dropped</option>
-          <option value="unassigned">Unassigned</option>
-        </select>
+        {isAccountant ? (
+          <select className="glass-input" value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.7rem' }}>
+            <option value="all">All States</option>
+            <option value="fees_pending">Fees Pending</option>
+            <option value="enrolled">Enrolled</option>
+            <option value="course_completed">Course Completed</option>
+          </select>
+        ) : (
+          <select className="glass-input" value={stateFilter} onChange={(e) => setStateFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.7rem' }}>
+            <option value="all">All States</option>
+            <option value="fees_pending">Fees Pending</option>
+            <option value="payment_rejected">Rejected Payment</option>
+            <option value="enrolled">Enrolled</option>
+            <option value="course_completed">Course Completed</option>
+            <option value="dropped">Dropped</option>
+            <option value="unassigned">Unassigned</option>
+          </select>
+        )}
 
         <select className="glass-input" value={premiumFilter} onChange={(e) => setPremiumFilter(e.target.value)} style={{ appearance: 'auto', padding: '0.7rem' }}>
           <option value="all">All Plans</option>
@@ -241,7 +342,9 @@ const Students = () => {
           <option value="free">Free</option>
         </select>
       </div>
+      )}
 
+      {activeTab === 'all_students' ? (
       <div className="glass-morphism" style={{ padding: '0', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1200px' }}>
           <thead>
@@ -284,6 +387,7 @@ const Students = () => {
                   </td>
                   <td style={{ padding: '1rem' }}>
                     <div style={{ display: 'grid', gap: '0.45rem' }}>
+                      {!isAccountant && (
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
                         <select className="glass-input" value={batchDrafts[student.id] || ''} onChange={(e) => setBatchDrafts({ ...batchDrafts, [student.id]: e.target.value })} style={{ appearance: 'auto', padding: '0.4rem', minWidth: '140px' }}>
                           <option value="">Unassign</option>
@@ -293,12 +397,21 @@ const Students = () => {
                           {rowSavingId === student.id ? <Loader2 size={14} className="animate-spin" /> : 'Save Batch'}
                         </button>
                       </div>
+                      )}
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <button className="btn-secondary" onClick={() => { setSelectedStudent(student); setIsProfileModalOpen(true); }} style={{ padding: '0.4rem 0.7rem' }}>Profile</button>
-                        {student.status === 'dropped' ? (
-                          <button className="btn-secondary" onClick={() => handleStatusChange(student, 'active')} style={{ padding: '0.4rem 0.7rem', borderColor: '#10b981', color: '#10b981' }}>Reactivate</button>
-                        ) : (
-                          <button className="btn-secondary" onClick={() => handleStatusChange(student, 'dropped')} style={{ padding: '0.4rem 0.7rem', borderColor: '#ef4444', color: '#ef4444' }}>Mark Dropped</button>
+                        <button className="btn-secondary" onClick={() => navigate(`/students/${student.id}`)} style={{ padding: '0.4rem 0.7rem' }}>Profile</button>
+                        {!isAccountant && student.derivedState === 'fees_pending' && (
+                          <button className="btn-secondary" onClick={() => navigate('/admin/pos')} style={{ padding: '0.4rem 0.7rem', borderColor: '#f97316', color: '#f97316' }}>Collect Fee</button>
+                        )}
+                        {isAccountant && student.derivedState === 'fees_pending' && (
+                          <button className="btn-secondary" onClick={() => navigate('/pos')} style={{ padding: '0.4rem 0.7rem', borderColor: '#f97316', color: '#f97316' }}>Collect Fee</button>
+                        )}
+                        {!isAccountant && (
+                          student.status === 'dropped' ? (
+                            <button className="btn-secondary" onClick={() => handleStatusChange(student, 'active')} style={{ padding: '0.4rem 0.7rem', borderColor: '#10b981', color: '#10b981' }}>Reactivate</button>
+                          ) : (
+                            <button className="btn-secondary" onClick={() => handleStatusChange(student, 'dropped')} style={{ padding: '0.4rem 0.7rem', borderColor: '#ef4444', color: '#ef4444' }}>Mark Dropped</button>
+                          )
                         )}
                       </div>
                     </div>
@@ -309,6 +422,55 @@ const Students = () => {
           </tbody>
         </table>
       </div>
+      ) : (
+      <div className="glass-morphism" style={{ padding: '0', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1200px' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: '0.8rem' }}>
+              <th style={{ padding: '1rem' }}>Student</th>
+              <th style={{ padding: '1rem' }}>Course</th>
+              <th style={{ padding: '1rem' }}>Completion</th>
+              <th style={{ padding: '1rem' }}>Final Result</th>
+              <th style={{ padding: '1rem' }}>Target Country</th>
+              <th style={{ padding: '1rem' }}>Destination Country</th>
+              <th style={{ padding: '1rem' }}>English Level</th>
+              <th style={{ padding: '1rem' }}>Recorded</th>
+              <th style={{ padding: '1rem' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {successRecordStudents.map((student) => (
+              <tr key={student.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '1rem' }}>
+                  <div style={{ fontWeight: 600 }}>{student.User?.name}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>ID: STU-{student.id}</div>
+                </td>
+                <td style={{ padding: '1rem', fontSize: '0.82rem' }}>{student.Batch?.Course?.title || 'N/A'}</td>
+                <td style={{ padding: '1rem', fontSize: '0.82rem' }}>{formatDate(student.course_completion_date || student.Batch?.end_date)}</td>
+                <td style={{ padding: '1rem', fontSize: '0.82rem' }}>{student.final_course_result || 'Not recorded'}</td>
+                <td style={{ padding: '1rem', fontSize: '0.82rem' }}>{student.target_country || 'N/A'}</td>
+                <td style={{ padding: '1rem', fontSize: '0.82rem' }}>{student.success_destination_country || 'Not recorded'}</td>
+                <td style={{ padding: '1rem', fontSize: '0.82rem' }}>{student.english_level ? `${student.english_level.charAt(0).toUpperCase()}${student.english_level.slice(1)}` : 'N/A'}</td>
+                <td style={{ padding: '1rem', fontSize: '0.82rem' }}>{formatDate(student.success_recorded_at)}</td>
+                <td style={{ padding: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button className="btn-secondary" onClick={() => openSuccessModal(student)} style={{ padding: '0.4rem 0.7rem', borderColor: '#10b981', color: '#10b981' }}>
+                      {student.has_success_record ? 'Edit Record' : 'Add Record'}
+                    </button>
+                    <button className="btn-secondary" onClick={() => navigate(`/students/${student.id}`)} style={{ padding: '0.4rem 0.7rem' }}>Profile</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {successRecordStudents.length === 0 && (
+              <tr>
+                <td colSpan="9" style={{ padding: '1.5rem', color: 'var(--text-dim)', textAlign: 'center' }}>No completed or successful student records found yet.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      )}
 
       {/* Add New Student Modal */}
       <AddStudentModal
@@ -320,40 +482,38 @@ const Students = () => {
         isAdding={isAdding}
       />
 
-      <Modal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} title="Student Profile">
+      {/* Removed old Profile Modal logic here */}
+
+      <Modal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} title="Success Record">
         {selectedStudent && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '70vh', overflowY: 'auto', paddingRight: '0.3rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div className="glass-morphism" style={{ padding: '1rem' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <UserCircle size={18} /> {selectedStudent.User?.name}
-                {selectedStudent.isPremium && <Star size={14} color="#facc15" fill="#facc15" />}
-              </h3>
-              <p style={{ margin: '0.3rem 0 0 0', color: 'var(--text-dim)', fontSize: '0.8rem' }}>{selectedStudent.User?.email}</p>
+              <h4 style={{ margin: 0 }}>{selectedStudent.User?.name}</h4>
+              <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.82rem', color: 'var(--text-dim)' }}>
+                {selectedStudent.Batch?.Course?.title || 'No course'} · Completed: {formatDate(selectedStudent.course_completion_date || selectedStudent.Batch?.end_date)}
+              </p>
             </div>
 
-            <div className="glass-morphism" style={{ padding: '1rem' }}>
-              <h4 style={{ marginTop: 0 }}>Enrollment Details</h4>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Enrollment Date:</strong> {formatDate(selectedStudent.enrollment_date)}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Course:</strong> {selectedStudent.Batch?.Course?.title || 'N/A'}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Batch:</strong> {selectedStudent.Batch?.code || 'Unassigned'}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Batch End Date:</strong> {formatDate(selectedStudent.Batch?.end_date)}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Current State:</strong> {stateLabel[selectedStudent.derivedState || getDerivedState(selectedStudent)]}</p>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem' }}>Final Course Result</label>
+              <input className="glass-input" value={successForm.final_course_result} onChange={(e) => setSuccessForm((prev) => ({ ...prev, final_course_result: e.target.value }))} placeholder="e.g. PTE 79, IELTS 7.5, Completed Spoken English Advanced" style={{ width: '100%', padding: '0.7rem' }} />
             </div>
 
-            <div className="glass-morphism" style={{ padding: '1rem' }}>
-              <h4 style={{ marginTop: 0 }}>Premium PTE Plan</h4>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Plan:</strong> {(selectedStudent.plan_type || 'free').toUpperCase()}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Premium Start:</strong> {formatDate(selectedStudent.premium_start_date)}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Premium Expiry:</strong> {formatDate(selectedStudent.premium_expiry_date)}</p>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem' }}>Successful Destination Country</label>
+              <input className="glass-input" value={successForm.success_destination_country} onChange={(e) => setSuccessForm((prev) => ({ ...prev, success_destination_country: e.target.value }))} placeholder="e.g. Canada, Australia, UK" style={{ width: '100%', padding: '0.7rem' }} />
             </div>
 
-            <div className="glass-morphism" style={{ padding: '1rem' }}>
-              <h4 style={{ marginTop: 0 }}>Personal Data</h4>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Mobile:</strong> {selectedStudent.mobile_no || 'N/A'}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Current Address:</strong> {selectedStudent.current_address || 'N/A'}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Permanent Address:</strong> {selectedStudent.permanent_address || 'N/A'}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Father Name:</strong> {selectedStudent.father_name || 'N/A'}</p>
-              <p style={{ margin: '0.2rem 0', fontSize: '0.85rem' }}><strong>Mother Name:</strong> {selectedStudent.mother_name || 'N/A'}</p>
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem' }}>Success Notes</label>
+              <textarea className="glass-input" value={successForm.success_notes} onChange={(e) => setSuccessForm((prev) => ({ ...prev, success_notes: e.target.value }))} placeholder="Extra notes about the final outcome" style={{ width: '100%', padding: '0.7rem', minHeight: '100px' }} />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+              <button type="button" className="btn-secondary" onClick={() => setIsSuccessModalOpen(false)}>Cancel</button>
+              <button type="button" className="btn-primary" onClick={handleSaveSuccessRecord} disabled={rowSavingId === selectedStudent.id}>
+                {rowSavingId === selectedStudent.id ? <Loader2 size={16} className="animate-spin" /> : 'Save Success Record'}
+              </button>
             </div>
           </div>
         )}

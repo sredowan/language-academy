@@ -50,5 +50,7 @@ router.delete('/campaigns/:id', crmController.deleteCampaign);
 router.get('/analytics/funnel', crmController.getFunnel);
 router.get('/analytics/source', crmController.getSourceAnalysis);
 router.get('/analytics/forecast', crmController.getRevenueForecast);
+router.get('/analytics/success-results', crmController.getSuccessResultsAnalysis);
+router.get('/analytics/destination-countries', crmController.getSuccessDestinationAnalysis);
 
 module.exports = router;

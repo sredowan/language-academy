@@ -10,7 +10,8 @@ import {
   Loader2,
   TrendingUp,
   Settings2,
-  Banknote
+  Banknote,
+  Download
 } from 'lucide-react';
 import api from '../services/api';
 import Modal from '../components/Modal';
@@ -40,7 +41,7 @@ const Payroll = () => {
 
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [newStaffData, setNewStaffData] = useState({
-    name: '', email: '', password: '', role: 'teacher',
+    name: '', email: '', joining_date: '', role: 'unassigned',
     designation: '', base_salary: '', bank_name: '', account_no: '',
     father_name: '', mother_name: '', address: '', contact_details: '',
     educational_background: '', work_experience: ''
@@ -93,7 +94,6 @@ const Payroll = () => {
       const authRes = await api.post('/auth/register', {
         name: newStaffData.name,
         email: newStaffData.email,
-        password: newStaffData.password,
         role: newStaffData.role,
         branch_id: 1 // Managed by superadmin logic or current branch context
       });
@@ -111,6 +111,7 @@ const Payroll = () => {
         mother_name: newStaffData.mother_name,
         address: newStaffData.address,
         contact_details: newStaffData.contact_details,
+        joining_date: newStaffData.joining_date,
         educational_background: newStaffData.educational_background ? JSON.parse(newStaffData.educational_background) : [],
         work_experience: newStaffData.work_experience ? JSON.parse(newStaffData.work_experience) : []
       };
@@ -119,7 +120,7 @@ const Payroll = () => {
 
       setShowAddStaffModal(false);
       setNewStaffData({
-        name: '', email: '', password: '', role: 'teacher',
+        name: '', email: '', joining_date: '', role: 'unassigned',
         designation: '', base_salary: '', bank_name: '', account_no: '',
         father_name: '', mother_name: '', address: '', contact_details: '',
         educational_background: '', work_experience: ''
@@ -153,6 +154,23 @@ const Payroll = () => {
     }
   };
 
+  const exportPDF = async () => {
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const element = document.getElementById('salary-sheet-container');
+      const opt = {
+        margin: 0.5,
+        filename: `Salary_Sheet_${month}_${year}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+      html2pdf().set(opt).from(element).save();
+    } catch(err) {
+      alert("Failed to export PDF! " + err.message);
+    }
+  };
+
   if (loading) return <div className="canvas"><Loader2 className="animate-spin" color="var(--primary)" size={48} /></div>;
 
   return (
@@ -171,6 +189,9 @@ const Payroll = () => {
               {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
+          <button className="btn-secondary" onClick={exportPDF} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+             <Download size={16} /> Export PDF
+          </button>
           <button className="btn-primary" onClick={handleGeneratePayroll}>
             <TrendingUp size={18} /> Run Payroll
           </button>
@@ -179,7 +200,7 @@ const Payroll = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
         {/* Payroll Processing */}
-        <div className="glass-morphism" style={{ padding: '1.5rem' }}>
+        <div id="salary-sheet-container" className="glass-morphism" style={{ padding: '1.5rem' }}>
           <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
              <History size={18} /> {new Date(0, month-1).toLocaleString('default', { month: 'long' })} {year} Payroll Sheet
           </h3>
@@ -319,18 +340,7 @@ const Payroll = () => {
           </div>
           <div className="form-group"><label>Full Name</label><input required className="glass-input" value={newStaffData.name} onChange={e => setNewStaffData({...newStaffData, name: e.target.value})} /></div>
           <div className="form-group"><label>Email</label><input required type="email" className="glass-input" value={newStaffData.email} onChange={e => setNewStaffData({...newStaffData, email: e.target.value})} /></div>
-          <div className="form-group"><label>Password</label><input required type="password" className="glass-input" value={newStaffData.password} onChange={e => setNewStaffData({...newStaffData, password: e.target.value})} /></div>
-          <div className="form-group">
-            <label>System Role</label>
-            <select className="glass-input" value={newStaffData.role} onChange={e => setNewStaffData({...newStaffData, role: e.target.value})} style={{ appearance: 'auto', padding: '0.8rem' }}>
-              <option value="teacher">Teacher / Trainer</option>
-              <option value="staff">Administrative Staff</option>
-              <option value="branch_admin">Branch Admin</option>
-              <option value="accounts">Accountant</option>
-              <option value="counselor">CRM / Counselor</option>
-              <option value="hr">HR Manager</option>
-            </select>
-          </div>
+          <div className="form-group"><label>Joining Date</label><input type="date" className="glass-input" value={newStaffData.joining_date} onChange={e => setNewStaffData({...newStaffData, joining_date: e.target.value})} /></div>
 
           <div style={{ gridColumn: 'span 2', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem', marginTop: '0.5rem' }}>
             <h4 style={{ fontSize: '1rem', color: 'var(--primary)', margin: 0 }}>HR & Payroll Info</h4>

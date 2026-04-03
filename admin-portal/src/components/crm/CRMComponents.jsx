@@ -17,7 +17,7 @@ export const PriorityBadge = ({ priority }) => {
 
 export const stageColors = {
   new: '#6b7280', contacted: '#3b82f6', interested: '#f59e0b',
-  trial: '#8b5cf6', enrolled: '#06b6d4', fees_pending: '#f97316',
+  trial: '#8b5cf6', enrolled: '#06b6d4', fees_pending: '#f97316', payment_rejected: '#ef4444',
   successful: '#10b981', lost: '#ef4444',
   qualification: '#3b82f6', proposal: '#f59e0b', demo: '#8b5cf6',
   negotiation: '#f97316', won: '#10b981',
@@ -25,13 +25,13 @@ export const stageColors = {
 
 export const stageLabels = {
   new: 'New Lead', contacted: 'Contacted', interested: 'Interested',
-  trial: 'Trial Class', enrolled: 'Enrolled', fees_pending: 'Fees Pending',
+  trial: 'Trial Class', enrolled: 'Enrolled', fees_pending: 'Fees Pending', payment_rejected: 'Payment Rejected',
   successful: '✅ Successful', lost: '❌ Lost',
 };
 
 export const stageIcons = {
   new: '🎯', contacted: '📞', interested: '⭐', trial: '🧪',
-  enrolled: '📝', fees_pending: '⏳', successful: '🏆', lost: '❌',
+  enrolled: '📝', fees_pending: '⏳', payment_rejected: '🚫', successful: '🏆', lost: '❌',
 };
 
 export const actIcons = { call: '📞', email: '✉️', meeting: '🤝', demo: '💻', whatsapp: '💬', note: '📝', task: '✅' };

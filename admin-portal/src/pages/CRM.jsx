@@ -27,11 +27,11 @@ const CRMHub = () => {
   const [activities, setActivities] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [analytics, setAnalytics] = useState({ funnel: null, source: [], forecast: null });
+  const [analytics, setAnalytics] = useState({ funnel: null, source: [], forecast: null, successResults: [], destinationCountries: [] });
 
   const fetchAll = useCallback(async () => {
     try {
-      const [lRes, cRes, oRes, aRes, camRes, crRes, fRes, sRes, fcRes] = await Promise.all([
+      const [lRes, cRes, oRes, aRes, camRes, crRes, fRes, sRes, fcRes, srRes, dcRes] = await Promise.all([
         api.get('/crm/leads').catch(() => ({ data: [] })),
         api.get('/crm/contacts').catch(() => ({ data: [] })),
         api.get('/crm/opportunities').catch(() => ({ data: [] })),
@@ -41,10 +41,12 @@ const CRMHub = () => {
         api.get('/crm/analytics/funnel').catch(() => ({ data: null })),
         api.get('/crm/analytics/source').catch(() => ({ data: [] })),
         api.get('/crm/analytics/forecast').catch(() => ({ data: null })),
+        api.get('/crm/analytics/success-results').catch(() => ({ data: [] })),
+        api.get('/crm/analytics/destination-countries').catch(() => ({ data: [] })),
       ]);
       setLeads(lRes.data); setContacts(cRes.data); setOpportunities(oRes.data);
       setActivities(aRes.data); setCampaigns(camRes.data); setCourses(crRes.data);
-      setAnalytics({ funnel: fRes.data, source: sRes.data, forecast: fcRes.data });
+      setAnalytics({ funnel: fRes.data, source: sRes.data, forecast: fcRes.data, successResults: srRes.data, destinationCountries: dcRes.data });
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
@@ -55,6 +57,7 @@ const CRMHub = () => {
   const overdueAct = activities.filter(a => !a.is_done && a.due_date && new Date(a.due_date) < new Date()).length;
   const newCount = leads.filter(l => l.status === 'new').length;
   const pendingFees = leads.filter(l => l.status === 'fees_pending').length;
+  const rejectedPayments = leads.filter(l => l.status === 'payment_rejected').length;
   const successCount = leads.filter(l => l.status === 'successful').length;
   const successRevenue = leads.filter(l => l.status === 'successful').reduce((s,l) => s + parseFloat(l.deal_value||0), 0);
 
@@ -81,10 +84,11 @@ const CRMHub = () => {
         </div>
 
         {/* KPI Strip */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.8rem', marginTop: '1.2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.8rem', marginTop: '1.2rem' }}>
           {[
             { label: 'NEW LEADS', value: newCount, color: '#3b82f6', icon: '🎯' },
             { label: 'PENDING FEES', value: pendingFees, color: '#f59e0b', icon: '⏳' },
+            { label: 'PAYMENT REJECTED', value: rejectedPayments, color: '#ef4444', icon: '🚫' },
             { label: 'SUCCESSFUL', value: successCount, color: '#10b981', icon: '✅' },
             { label: 'REVENUE', value: `৳${successRevenue.toLocaleString()}`, color: '#06b6d4', icon: '💰' },
             { label: 'PIPELINE', value: `৳${totalPipeline.toLocaleString()}`, color: '#8b5cf6', icon: '📊' },
@@ -112,7 +116,7 @@ const CRMHub = () => {
           }}>
             {tab.icon} {tab.label}
             {tab.id === 'activities' && overdueAct > 0 && <span style={{ background: '#ef4444', color: '#fff', borderRadius: '8px', padding: '1px 5px', fontSize: '0.55rem', fontWeight: '800' }}>{overdueAct}</span>}
-            {tab.id === 'pipeline' && pendingFees > 0 && <span style={{ background: '#f59e0b', color: '#000', borderRadius: '8px', padding: '1px 5px', fontSize: '0.55rem', fontWeight: '800' }}>{pendingFees}</span>}
+             {tab.id === 'pipeline' && (pendingFees + rejectedPayments) > 0 && <span style={{ background: '#f59e0b', color: '#000', borderRadius: '8px', padding: '1px 5px', fontSize: '0.55rem', fontWeight: '800' }}>{pendingFees + rejectedPayments}</span>}
           </button>
         ))}
       </div>

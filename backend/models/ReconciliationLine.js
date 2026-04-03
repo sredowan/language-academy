@@ -42,6 +42,31 @@ const ReconciliationLine = sequelize.define('ReconciliationLine', {
     type: DataTypes.DECIMAL(15, 2),
     defaultValue: 0,
   },
+  opening_balance: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0,
+  },
+  expected_closing_balance: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0,
+  },
+  actual_closing_balance: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0,
+  },
+  discrepancy_amount: {
+    type: DataTypes.DECIMAL(15, 2),
+    defaultValue: 0,
+  },
+  discrepancy_reason: {
+    type: DataTypes.TEXT,
+  },
+  submitted_by: {
+    type: DataTypes.INTEGER,
+  },
+  submitted_at: {
+    type: DataTypes.DATE,
+  },
   ledger_debit: {
     type: DataTypes.DECIMAL(15, 2),
     defaultValue: 0,

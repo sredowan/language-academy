@@ -17,7 +17,7 @@ const PremiumBanner = () => {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     return (
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white px-4 py-2 rounded-lg mb-6 flex items-center justify-between shadow-lg animate-in fade-in slide-in-from-top-4 duration-500">
+      <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white px-4 py-2 rounded-lg mb-6 flex items-center justify-between shadow-lg animate-in fade-in slide-in-from-top-4 duration-500">
         <div className="flex items-center gap-3">
           <div className="bg-white/20 p-1.5 rounded-full">
             <Zap className="w-4 h-4 text-white fill-white" />
@@ -40,11 +40,9 @@ const PremiumBanner = () => {
   }
 
   return (
-    <div className="bg-gradient-to-r from-indigo-600 to-blue-500 text-white px-4 py-3 rounded-xl mb-6 flex items-center justify-between shadow-xl ring-1 ring-white/10">
+    <div className="bg-gradient-to-r from-[var(--primary)] to-[#204a82] text-white px-4 py-3 rounded-xl mb-6 flex items-center justify-between shadow-xl ring-1 ring-white/10">
       <div className="flex items-center gap-4">
-        <div className="bg-yellow-400 p-2 rounded-lg shadow-inner">
-          <Zap className="w-5 h-5 text-indigo-900 fill-indigo-900" />
-        </div>
+          <Zap className="w-5 h-5 text-yellow-400 fill-yellow-400" />
         <div>
           <h4 className="text-sm font-bold">Upgrade to Premium</h4>
           <p className="text-xs opacity-90">Unlock full AI scoring, mock tests & prediction bank.</p>
@@ -52,7 +50,7 @@ const PremiumBanner = () => {
       </div>
       <button 
         onClick={() => navigate('/subscription')}
-        className="bg-white text-indigo-600 px-5 py-2 rounded-lg font-bold text-xs shadow-sm hover:scale-105 transition-transform active:scale-95"
+        className="bg-white text-[var(--accent)] px-5 py-2 rounded-lg font-bold text-xs shadow-sm hover:scale-105 transition-transform active:scale-95"
       >
         Buy Now - 2500 BDT
       </button>

@@ -30,6 +30,11 @@ const CampaignTemplate = sequelize.define('CampaignTemplate', {
     type: DataTypes.TEXT,
     allowNull: false,
   },
+  attachment_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Optional URL to an attachment file',
+  },
   status: {
     type: DataTypes.ENUM('draft', 'sent', 'scheduled'),
     defaultValue: 'draft',

@@ -2,6 +2,7 @@ const Course = require('../models/Course');
 const BlogPost = require('../models/BlogPost');
 const Batch = require('../models/Batch');
 const Lead = require('../models/Lead');
+const { Op } = require('sequelize');
 const sequelize = require('../config/db.config');
 
 exports.getPublishedCourses = async (req, res) => {
@@ -23,18 +24,23 @@ exports.getPublishedCourses = async (req, res) => {
 exports.getCourseDetails = async (req, res) => {
   try {
     const { slug } = req.params;
+    const isId = /^\d+$/.test(slug);
+    
     const course = await Course.findOne({
       where: {
-        slug: slug,
+        [Op.or]: [
+          { slug: slug },
+          ...(isId ? [{ id: parseInt(slug, 10) }] : [])
+        ],
         is_published: true,
         status: 'active'
       },
       include: [
         {
           model: Batch,
-          where: { status: 'upcoming' },
-          required: false, // Don't fail if no upcoming batches
-          attributes: ['id', 'name', 'start_date', 'fee', 'schedule', 'capacity', 'enrolled']
+          where: { status: { [Op.in]: ['enrolling', 'starting_soon'] } },
+          required: false,
+          attributes: ['id', 'name', 'start_date', 'schedule', 'capacity', 'enrolled']
         }
       ]
     });
@@ -84,7 +90,7 @@ exports.getBlogDetails = async (req, res) => {
 
 exports.submitContactForm = async (req, res) => {
   try {
-    const { name, email, phone, subject, message, course_interest } = req.body;
+    const { name, email, phone, subject, message, course_interest, destination_country } = req.body;
 
     // Calculate a basic score: +20 for phone, +15 for email, +15 for course interest
     let score = 20;
@@ -97,6 +103,7 @@ exports.submitContactForm = async (req, res) => {
       name,
       email,
       phone,
+      destination_country,
       source: 'Website Enquiry',
       status: 'new',
       priority: 'medium',
@@ -110,5 +117,84 @@ exports.submitContactForm = async (req, res) => {
   } catch (err) {
     console.error('Error submitting contact form:', err);
     res.status(500).json({ message: 'Error submitting contact form' });
+  }
+};
+
+exports.getCourseBatches = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const isId = /^\d+$/.test(slug);
+    
+    const course = await Course.findOne({
+      where: { 
+        [Op.or]: [
+          { slug: slug },
+          ...(isId ? [{ id: parseInt(slug, 10) }] : [])
+        ],
+        is_published: true, 
+        status: 'active' 
+      }
+    });
+    
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+    
+    const batches = await Batch.findAll({
+      where: { course_id: course.id, status: { [Op.in]: ['enrolling', 'starting_soon'] } },
+      attributes: ['id', 'name', 'start_date', 'schedule', 'capacity', 'enrolled'],
+      order: [['start_date', 'ASC']]
+    });
+    
+    res.json(batches);
+  } catch (err) {
+    console.error('Error fetching course batches:', err);
+    res.status(500).json({ message: 'Error fetching course batches' });
+  }
+};
+
+exports.submitCourseEnquiry = async (req, res) => {
+  try {
+    const { course_id, batch_id, name, email, phone, message, destination_country } = req.body;
+    let course = null;
+    let dealValue = 0;
+    
+    if (course_id) {
+       course = await Course.findByPk(course_id);
+       if (course) dealValue = course.base_fee;
+    }
+    
+    let batchName = '';
+    if (batch_id) {
+       const batch = await Batch.findByPk(batch_id);
+       if (batch) batchName = batch.name;
+    }
+
+    let score = 30;
+    if (phone) score += 20;
+    if (email) score += 15;
+
+    const lead = await Lead.create({
+      branch_id: 1, // default HQ
+      name,
+      email,
+      phone,
+      destination_country,
+      source: 'website',
+      status: 'interested',
+      priority: 'high',
+      score,
+      course_id: course_id || null,
+      batch_id: batch_id || null,
+      batch_interest: batchName,
+      deal_value: dealValue,
+      notes: message ? `Enquiry Message: ${message}` : '',
+      last_activity_at: new Date(),
+    });
+
+    res.status(201).json({ message: 'Enquiry submitted successfully! We will get in touch shortly.', leadId: lead.id });
+  } catch (err) {
+    console.error('Error submitting course enquiry:', err);
+    res.status(500).json({ message: 'Error submitting course enquiry' });
   }
 };

@@ -10,5 +10,7 @@ router.use(branchMiddleware);
 router.get('/transactions', posController.getTransactions);
 router.get('/pending', posController.getPendingInvoices);
 router.post('/collect-fee', posController.collectFee);
+router.post('/collect-custom-income', posController.collectCustomIncome);
+router.post('/reject-fee', posController.rejectPendingInvoice);
 
 module.exports = router;

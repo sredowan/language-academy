@@ -24,11 +24,11 @@ const Walkthrough = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-16 py-10 animate-in fade-in duration-700">
       <div className="text-center space-y-4">
-        <div className="bg-indigo-600 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest inline-block mb-2">
+        <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest inline-block mb-2">
            Project Completed
         </div>
-        <h1 className="text-5xl font-black tracking-tight text-gray-900 dark:text-white">
-          PTE SaaS <span className="text-indigo-600">Premium Upgrade</span>
+        <h1 className="text-5xl font-black tracking-tight text-[var(--text-main)]">
+          PTE SaaS <span className="text-[var(--primary)]">Premium Upgrade</span>
         </h1>
         <p className="max-w-2xl mx-auto text-gray-500 font-medium leading-relaxed">
           The Language Academy student portal has been transformed into a production-ready SaaS platform with intensive PTE features and a robust monetization engine.
@@ -37,8 +37,8 @@ const Walkthrough = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {features.map((f, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 p-8 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
-             <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl text-indigo-600 inline-block mb-6">
+          <div key={i} className="glass-morphism p-8 rounded-3xl border border-[var(--border)] border-[var(--border)] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all">
+             <div className="p-3 bg-[var(--glass)] dark:bg-indigo-900/20 rounded-2xl text-[var(--primary)] inline-block mb-6">
                 <f.icon className="w-6 h-6" />
              </div>
              <h3 className="text-lg font-black mb-2">{f.title}</h3>
@@ -47,7 +47,7 @@ const Walkthrough = () => {
         ))}
       </div>
 
-      <div className="bg-indigo-600 rounded-[3rem] p-12 text-white relative overflow-hidden text-center">
+      <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-[3rem] p-12 text-white relative overflow-hidden text-center">
          <div className="relative z-10">
             <h2 className="text-3xl font-black mb-4">Ready for Launch</h2>
             <p className="opacity-80 max-w-xl mx-auto mb-10 font-medium">

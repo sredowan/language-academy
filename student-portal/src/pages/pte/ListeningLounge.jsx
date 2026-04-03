@@ -63,7 +63,7 @@ const ListeningLounge = () => {
     }
   };
 
-  if (loading || !task) return <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-indigo-600" /></div>;
+  if (loading || !task) return <div className="p-20 text-center"><Loader2 className="w-10 h-10 animate-spin mx-auto text-[var(--primary)]" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
@@ -77,23 +77,23 @@ const ListeningLounge = () => {
             <p className="text-sm text-gray-500 font-medium">Listening Section • {task.max_score} Points</p>
           </div>
         </div>
-        <div className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm font-black flex items-center gap-2">
-          <Clock className="w-4 h-4 text-indigo-600" />
+        <div className="px-4 py-2 glass-morphism rounded-xl border border-[var(--border)] border-[var(--border)] shadow-sm font-black flex items-center gap-2">
+          <Clock className="w-4 h-4 text-[var(--primary)]" />
           <span>{Math.floor(timer/60)}:{(timer%60).toString().padStart(2, '0')}</span>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-10 border border-gray-100 dark:border-gray-700 shadow-sm space-y-10">
+      <div className="glass-morphism rounded-3xl p-10 border border-[var(--border)] border-[var(--border)] shadow-sm space-y-10">
         
         {/* Audio Player UX */}
         <div className="flex flex-col items-center space-y-6">
-           <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/40 rounded-full flex items-center justify-center text-indigo-600">
+           <div className="w-20 h-20 bg-[var(--glass)] dark:bg-indigo-900/40 rounded-full flex items-center justify-center text-[var(--primary)]">
               <Volume2 className="w-10 h-10" />
            </div>
            
            <div className="w-full max-w-lg space-y-4">
               <div className="h-2 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                 <div className="h-full bg-indigo-600 transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                 <div className="h-full bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white transition-all duration-300" style={{ width: `${progress}%` }}></div>
               </div>
               <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                  <span>0:00</span>
@@ -106,7 +106,7 @@ const ListeningLounge = () => {
              className={`flex items-center gap-3 px-10 py-4 rounded-2xl font-black text-sm transition-all shadow-xl ${
                isPlaying 
                ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200' 
-               : 'bg-indigo-600 text-white shadow-indigo-600/20 hover:scale-105 active:scale-95'
+               : 'bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white shadow-indigo-600/20 hover:scale-105 active:scale-95'
              }`}
            >
              {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
@@ -120,7 +120,7 @@ const ListeningLounge = () => {
              <Info className="w-4 h-4" /> Your Response
            </h3>
            <textarea 
-             className="w-full h-40 bg-gray-50 dark:bg-gray-900/50 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 outline-none text-base font-medium focus:ring-2 focus:ring-indigo-600 transition-all"
+             className="w-full h-40 bg-gray-50 dark:bg-gray-900/50 p-6 rounded-2xl border border-[var(--border)] dark:border-gray-800 outline-none text-base font-medium focus:ring-2 focus:ring-indigo-600 transition-all"
              placeholder="Type your answer, transcript, or summary based on the audio above..."
              value={response}
              onChange={(e) => setResponse(e.target.value)}
@@ -131,7 +131,7 @@ const ListeningLounge = () => {
            <button 
              onClick={handleSubmit}
              disabled={!response.trim() || status === 'finished'}
-             className="flex items-center gap-2 px-10 py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50"
+             className="flex items-center gap-2 px-10 py-4 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50"
            >
              {status === 'submitting' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
              Submit Attempt
@@ -140,14 +140,14 @@ const ListeningLounge = () => {
       </div>
 
       {result && (
-        <div className="bg-white dark:bg-gray-800 rounded-3xl p-10 border-2 border-emerald-500/20 shadow-2xl space-y-6 animate-in zoom-in duration-300">
+        <div className="glass-morphism rounded-3xl p-10 border-2 border-emerald-500/20 shadow-2xl space-y-6 animate-in zoom-in duration-300">
            <div className="flex items-center justify-between">
               <h3 className="text-2xl font-black">Performance Report</h3>
-              <div className="text-3xl font-black text-indigo-600">{result.score || 0}<span className="text-sm text-gray-400">/90</span></div>
+              <div className="text-3xl font-black text-[var(--primary)]">{result.score || 0}<span className="text-sm text-gray-400">/90</span></div>
            </div>
 
-           <div className="p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl text-sm leading-relaxed border border-gray-100 dark:border-gray-800">
-              <h4 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+           <div className="p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl text-sm leading-relaxed border border-[var(--border)] dark:border-gray-800">
+              <h4 className="font-bold text-[var(--text-main)] mb-3 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-500" /> AI Insights
               </h4>
               <p className="text-gray-600 dark:text-gray-400">
@@ -157,7 +157,7 @@ const ListeningLounge = () => {
               </p>
            </div>
            
-           <button onClick={() => navigate('/pte')} className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg">
+           <button onClick={() => navigate('/pte')} className="w-full py-4 bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white text-white font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg">
              Explore More Tasks
            </button>
         </div>

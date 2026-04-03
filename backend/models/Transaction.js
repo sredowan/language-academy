@@ -4,6 +4,7 @@ const Branch = require('./Branch');
 const Enrollment = require('./Enrollment');
 const User = require('./User');
 const Account = require('./Account');
+const Invoice = require('./Invoice');
 
 const Transaction = sequelize.define('Transaction', {
   id: {
@@ -19,6 +20,10 @@ const Transaction = sequelize.define('Transaction', {
   enrollment_id: {
     type: DataTypes.INTEGER,
     references: { model: Enrollment, key: 'id' },
+  },
+  invoice_id: {
+    type: DataTypes.INTEGER,
+    references: { model: Invoice, key: 'id' },
   },
   receipt_no: {
     type: DataTypes.STRING,
@@ -62,6 +67,7 @@ const Transaction = sequelize.define('Transaction', {
 
 Transaction.belongsTo(Branch, { foreignKey: 'branch_id' });
 Transaction.belongsTo(Enrollment, { foreignKey: 'enrollment_id' });
+Transaction.belongsTo(Invoice, { foreignKey: 'invoice_id' });
 Transaction.belongsTo(User, { as: 'Recorder', foreignKey: 'recorded_by' });
 Transaction.belongsTo(Account, { foreignKey: 'account_id' });
 

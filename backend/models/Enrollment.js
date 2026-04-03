@@ -45,7 +45,7 @@ const Enrollment = sequelize.define('Enrollment', {
     defaultValue: 0,
   },
   status: {
-    type: DataTypes.ENUM('paid', 'partial', 'pending', 'overdue'),
+    type: DataTypes.ENUM('paid', 'partial', 'pending', 'overdue', 'cancelled'),
     defaultValue: 'pending',
   },
 }, {

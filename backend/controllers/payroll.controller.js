@@ -28,14 +28,14 @@ exports.updateStaffProfile = async (req, res) => {
   try {
     const { 
       user_id, designation, base_salary, bank_name, account_no,
-      father_name, mother_name, address, contact_details, educational_background, work_experience
+      father_name, mother_name, address, contact_details, educational_background, work_experience, joining_date
     } = req.body;
     let profile = await StaffProfile.findOne({ where: { user_id } });
 
     if (profile) {
       await profile.update({ 
         designation, base_salary, bank_name, account_no,
-        father_name, mother_name, address, contact_details, educational_background, work_experience
+        father_name, mother_name, address, contact_details, educational_background, work_experience, joining_date
       });
     } else {
       profile = await StaffProfile.create({
@@ -45,7 +45,7 @@ exports.updateStaffProfile = async (req, res) => {
         base_salary,
         bank_name,
         account_no,
-        father_name, mother_name, address, contact_details, educational_background, work_experience
+        father_name, mother_name, address, contact_details, educational_background, work_experience, joining_date
       });
     }
     res.json(profile);
@@ -159,6 +159,22 @@ exports.processPayment = async (req, res) => {
         notes: `Paid via ${payment_method}`
       }
     ], { transaction: t });
+
+    // 3.5 Create corresponding Expense log so it maps to the Liquidity Dashboard correctly
+    const Expense = require('../models/Expense');
+    await Expense.create({
+      branch_id: req.branchId,
+      account_id: creditAccount.id,
+      amount: payroll.net_salary,
+      description: `Staff Salary: ${payroll.Staff.name} (${payroll.month}/${payroll.year})`,
+      category: 'Payroll & Salaries',
+      payment_method: payment_method,
+      date: new Date(),
+      status: 'approved',
+      verified_by: req.user.id,
+      approved_by: req.user.id,
+      verification_date: new Date()
+    }, { transaction: t });
 
     // 4. Update Payroll Record
     await payroll.update({
