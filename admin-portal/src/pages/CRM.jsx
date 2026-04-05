@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, Users, Target, Activity, Megaphone, BarChart2, Trophy } from 'lucide-react';
+import { Loader2, Users, Target, Activity, Megaphone, BarChart2, Trophy, Globe, Hourglass, XCircle, CheckCircle, DollarSign, TrendingUp } from 'lucide-react';
 import api from '../services/api';
 import PipelineTab from '../components/crm/PipelineTab';
 import ContactsTab from '../components/crm/ContactsTab';
@@ -78,34 +78,32 @@ const CRMHub = () => {
             </h2>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Manage leads, deals, and revenue in one place</p>
           </div>
-          <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', background: 'var(--glass)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-            🌐 Website Auto-Sync Active
+          <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', background: 'var(--glass)', padding: '0.4rem 0.8rem', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <Globe size={13} color="#10b981" /> Website Auto-Sync Active
           </div>
         </div>
 
         {/* KPI Strip */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.8rem', marginTop: '1.2rem' }}>
+        <div className="pulse-grid pg-6">
           {[
-            { label: 'NEW LEADS', value: newCount, color: '#3b82f6', icon: '🎯' },
-            { label: 'PENDING FEES', value: pendingFees, color: '#f59e0b', icon: '⏳' },
-            { label: 'PAYMENT REJECTED', value: rejectedPayments, color: '#ef4444', icon: '🚫' },
-            { label: 'SUCCESSFUL', value: successCount, color: '#10b981', icon: '✅' },
-            { label: 'REVENUE', value: `৳${successRevenue.toLocaleString()}`, color: '#06b6d4', icon: '💰' },
-            { label: 'PIPELINE', value: `৳${totalPipeline.toLocaleString()}`, color: '#8b5cf6', icon: '📊' },
+            { label: 'NEW LEADS', value: newCount, c: 'c-cyan', icon: <Target size={32} /> },
+            { label: 'PENDING FEES', value: pendingFees, c: 'c-amber', icon: <Hourglass size={32} /> },
+            { label: 'PAYMENT REJECTED', value: rejectedPayments, c: 'c-rose', icon: <XCircle size={32} /> },
+            { label: 'SUCCESSFUL', value: successCount, c: 'c-mint', icon: <CheckCircle size={32} /> },
+            { label: 'REVENUE', value: `৳${successRevenue.toLocaleString()}`, c: 'c-violet', icon: <DollarSign size={32} /> },
+            { label: 'PIPELINE', value: `৳${totalPipeline.toLocaleString()}`, c: 'c-cyan', icon: <TrendingUp size={32} /> },
           ].map(k => (
-            <div key={k.label} style={{ padding: '1rem 1.2rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', borderBottom: `3px solid ${k.color}` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <p style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '700' }}>{k.label}</p>
-                <span style={{ fontSize: '1rem' }}>{k.icon}</span>
-              </div>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: k.color, marginTop: '0.3rem' }}>{k.value}</h3>
+            <div key={k.label} className={`pulse-card ${k.c}`} style={{ padding: '24px 20px' }}>
+              <div className="pc-icon" style={{ top: '24px', right: '20px', opacity: 0.15 }}>{k.icon}</div>
+              <p className="pc-label">{k.label}</p>
+              <h3 className="pc-value">{k.value}</h3>
             </div>
           ))}
         </div>
       </div>
 
       {/* Tab Bar */}
-      <div style={{ display: 'flex', gap: '0.3rem', background: 'var(--glass)', padding: '0.35rem', borderRadius: '12px', width: 'fit-content', border: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', gap: '0.3rem', background: 'var(--glass)', padding: '0.35rem', borderRadius: '12px', width: 'fit-content', border: '1px solid var(--border)', margin: '1.5rem 0' }}>
         {TABS.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
             display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 1.1rem', border: 'none',

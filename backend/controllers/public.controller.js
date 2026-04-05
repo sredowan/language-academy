@@ -2,8 +2,11 @@ const Course = require('../models/Course');
 const BlogPost = require('../models/BlogPost');
 const Batch = require('../models/Batch');
 const Lead = require('../models/Lead');
+const Contact = require('../models/Contact');
+const Opportunity = require('../models/Opportunity');
 const { Op } = require('sequelize');
 const sequelize = require('../config/db.config');
+const fbCapi = require('../services/facebookCapi.service');
 
 exports.getPublishedCourses = async (req, res) => {
   try {
@@ -89,6 +92,7 @@ exports.getBlogDetails = async (req, res) => {
 };
 
 exports.submitContactForm = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const { name, email, phone, subject, message, course_interest, destination_country } = req.body;
 
@@ -111,10 +115,33 @@ exports.submitContactForm = async (req, res) => {
       batch_interest: course_interest || subject || '',
       notes: `Subject: ${subject}\nMessage: ${message}`,
       last_activity_at: new Date(),
-    });
+    }, { transaction: t });
 
+    let contact = null;
+    if (email) contact = await Contact.findOne({ where: { email, branch_id: 1 }, transaction: t });
+    if (!contact && phone) contact = await Contact.findOne({ where: { phone, branch_id: 1 }, transaction: t });
+    if (!contact) {
+      contact = await Contact.create({
+        branch_id: 1, name, phone, email, source: 'Website Enquiry', notes: `Subject: ${subject}\nMessage: ${message}`
+      }, { transaction: t });
+    }
+
+    await Opportunity.create({
+      branch_id: 1,
+      title: `${lead.name} – Website Enquiry`,
+      contact_id: contact.id, lead_id: lead.id,
+      value: 0,
+      stage: 'qualification',
+      course_interest: course_interest || subject || '',
+    }, { transaction: t });
+
+    await t.commit();
     res.status(201).json({ message: 'Enquiry submitted successfully! We will contact you shortly.', leadId: lead.id });
+
+    // Fire Facebook CAPI 'Contact' event (non-blocking)
+    fbCapi.sendContactEvent(req, { name, email, phone }).catch(() => {});
   } catch (err) {
+    await t.rollback();
     console.error('Error submitting contact form:', err);
     res.status(500).json({ message: 'Error submitting contact form' });
   }
@@ -154,19 +181,20 @@ exports.getCourseBatches = async (req, res) => {
 };
 
 exports.submitCourseEnquiry = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const { course_id, batch_id, name, email, phone, message, destination_country } = req.body;
     let course = null;
     let dealValue = 0;
     
     if (course_id) {
-       course = await Course.findByPk(course_id);
+       course = await Course.findByPk(course_id, { transaction: t });
        if (course) dealValue = course.base_fee;
     }
     
     let batchName = '';
     if (batch_id) {
-       const batch = await Batch.findByPk(batch_id);
+       const batch = await Batch.findByPk(batch_id, { transaction: t });
        if (batch) batchName = batch.name;
     }
 
@@ -190,10 +218,37 @@ exports.submitCourseEnquiry = async (req, res) => {
       deal_value: dealValue,
       notes: message ? `Enquiry Message: ${message}` : '',
       last_activity_at: new Date(),
-    });
+    }, { transaction: t });
 
+    let contact = null;
+    if (email) contact = await Contact.findOne({ where: { email, branch_id: 1 }, transaction: t });
+    if (!contact && phone) contact = await Contact.findOne({ where: { phone, branch_id: 1 }, transaction: t });
+    if (!contact) {
+      contact = await Contact.create({
+        branch_id: 1, name, phone, email, source: 'website', notes: message ? `Enquiry Message: ${message}` : ''
+      }, { transaction: t });
+    }
+
+    await Opportunity.create({
+      branch_id: 1,
+      title: `${lead.name} – ${course ? course.title : 'Course Enquiry'}`,
+      contact_id: contact.id, lead_id: lead.id,
+      value: dealValue,
+      stage: 'qualification',
+      course_interest: batchName || (course ? course.title : ''),
+    }, { transaction: t });
+
+    await t.commit();
     res.status(201).json({ message: 'Enquiry submitted successfully! We will get in touch shortly.', leadId: lead.id });
+
+    // Fire Facebook CAPI 'Lead' event (non-blocking)
+    fbCapi.sendLeadEvent(req, {
+      name, email, phone,
+      courseName: course ? course.title : 'Course Enquiry',
+      value: dealValue,
+    }).catch(() => {});
   } catch (err) {
+    await t.rollback();
     console.error('Error submitting course enquiry:', err);
     res.status(500).json({ message: 'Error submitting course enquiry' });
   }

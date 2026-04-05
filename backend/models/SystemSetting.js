@@ -24,6 +24,11 @@ const SystemSetting = sequelize.define('SystemSetting', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  category: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: 'general',
+  },
 }, {
   tableName: 'system_settings',
   underscored: true,

@@ -9,6 +9,7 @@ const Course = require('../models/Course');
 const Batch = require('../models/Batch');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const fbCapi = require('../services/facebookCapi.service');
 
 const initiateCheckout = async (req, res) => {
   try {
@@ -146,12 +147,59 @@ const paymentSuccess = async (req, res) => {
       recorded_by: user.id
     });
 
+    // Fetch course and batch details for the confirmation response
+    const course = lead.course_id ? await Course.findByPk(lead.course_id) : null;
+    const batch = lead.batch_id ? await Batch.findByPk(lead.batch_id) : null;
+
     res.status(200).json({
       message: 'Payment processed and enrollment successful',
       student_id: student.id,
       enrollment_id: enrollment.id,
-      transaction_id: transaction.id
+      transaction_id: transaction.id,
+      invoice_no: `INV-${transaction.id}`,
+      payment_ref,
+      order: {
+        student_name: lead.name,
+        email: lead.email,
+        phone: lead.phone,
+        course_name: course?.title || 'Course Enrollment',
+        course_category: course?.category || '',
+        course_duration: course?.duration_weeks ? `${course.duration_weeks} weeks` : '',
+        batch_name: batch?.name || '',
+        batch_schedule: batch?.schedule || '',
+        batch_start_date: batch?.start_date || null,
+        amount: lead.deal_value,
+        currency: 'BDT',
+        payment_method: 'card',
+        paid_at: transaction.paid_at,
+      }
     });
+
+    // Fire Facebook CAPI 'Purchase' event (non-blocking)
+    fbCapi.sendEvent(
+      'Purchase',
+      {
+        em: lead.email,
+        ph: lead.phone,
+        fn: lead.name?.split(' ')[0],
+        ln: lead.name?.split(' ').slice(1).join(' '),
+        client_ip_address: req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress,
+        client_user_agent: req.headers['user-agent'],
+        fbc: req.headers['x-fbc'] || null,
+        fbp: req.headers['x-fbp'] || null,
+        external_id: String(student.id),
+      },
+      {
+        currency: 'BDT',
+        value: lead.deal_value || 0,
+        content_name: course?.title || 'Course Enrollment',
+        content_type: 'product',
+        content_ids: [String(lead.course_id)],
+        num_items: 1,
+      },
+      req.headers['referer'] || req.headers['origin'] || 'https://languageacademy.com.bd/payment/success',
+      req.headers['x-event-id'] || null
+    ).catch(() => {});
   } catch (error) {
     console.error('Payment Success Processing Error:', error);
     res.status(500).json({ error: 'Failed to process payment success' });

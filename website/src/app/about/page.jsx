@@ -3,8 +3,16 @@ import Link from "next/link";
 import { Target, Award, Users, Globe2, Heart, BookOpen, Lightbulb, Shield, TrendingUp, MapPin, ArrowRight, Star, CheckCircle2, Laptop } from "lucide-react";
 
 export const metadata = {
-  title: "About Us | Language Academy — Our Mission",
-  description: "Learn about Language Academy, Bangladesh's modern English language coaching centre offering international standard courses.",
+  title: "About Us — Bangladesh's Leading PTE & IELTS Coaching Centre",
+  description:
+    "Language Academy is a modern English language coaching centre in Dhanmondi, Dhaka. We offer expert-led PTE Academic, IELTS, and Spoken English courses with international standards, AI mock tests, and small-batch classes for students planning to study abroad.",
+  alternates: { canonical: "https://languageacademy.com.bd/about" },
+  openGraph: {
+    title: "About Language Academy — Best PTE Coaching Centre in Dhaka",
+    description: "Discover our mission, values, and world-class facilities designed for serious PTE & IELTS preparation in Bangladesh.",
+    url: "https://languageacademy.com.bd/about",
+    images: [{ url: "/hero_banner.png", width: 1200, height: 630, alt: "About Language Academy Bangladesh" }],
+  },
 };
 
 const values = [
@@ -30,10 +38,10 @@ export default function AboutPage() {
           <div className="bg-gradient-to-br from-primary to-accent overflow-hidden rounded-[36px] px-8 py-12 text-white md:px-12 md:py-20 text-center relative shadow-xl shadow-primary/20">
             <div className="absolute inset-0 opacity-10 fine-grid mix-blend-overlay"></div>
             <div className="relative z-10">
-              <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] shadow-sm">Who We Are</span>
-              <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-black leading-tight md:text-6xl tracking-tight">An Exceptional Language Academy with International Standards</h1>
+              <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] shadow-sm">About Language Academy</span>
+              <h1 className="mx-auto mt-6 max-w-4xl text-4xl font-black leading-tight md:text-6xl tracking-tight">Bangladesh&apos;s Best PTE & IELTS Coaching Centre in Dhaka</h1>
               <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/90">
-                Forget the old ways of test prep. Language Academy is a modern, premium language coaching centre dedicated to securing your target score through interactive learning and cutting-edge technology.
+                Language Academy is a modern, premium coaching centre specializing in PTE Academic preparation — plus IELTS, Spoken English, and study abroad consulting. We offer both online and offline classes from our Dhanmondi campus in Dhaka, Bangladesh.
               </p>
             </div>
           </div>
@@ -46,7 +54,7 @@ export default function AboutPage() {
           <div className="premium-panel p-8 md:p-10 flex flex-col items-center text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-6"><Target size={32} /></div>
             <h2 className="text-2xl font-bold text-slate-900 mb-4">Our Mission</h2>
-            <p className="text-slate-600 leading-relaxed">To provide world-class language training combining expert instruction, cutting-edge AI technology, and personalized support — enabling every student to achieve their dream score and unlock global opportunities.</p>
+            <p className="text-slate-600 leading-relaxed">To be Bangladesh&apos;s best PTE coaching centre — providing world-class PTE Academic, IELTS, and Spoken English training through expert instructors, AI-powered mock tests, and personalized coaching that helps every student achieve their target score.</p>
           </div>
           <div className="premium-panel bg-slate-950 p-8 md:p-10 text-center text-white">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/20 text-accent mx-auto mb-6"><Globe2 size={32} /></div>

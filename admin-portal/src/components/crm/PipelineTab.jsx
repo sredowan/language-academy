@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Plus, Phone, Mail, X, ChevronRight, Trash2 } from 'lucide-react';
+import { Search, Plus, Phone, Mail, X, ChevronRight, Trash2, Book, DollarSign, Link, Calendar, FileSignature, Hourglass, Trophy, XCircle, Circle, ClipboardEdit } from 'lucide-react';
 import api from '../../services/api';
 import { ScoreBadge, PriorityBadge, stageColors, stageLabels, stageIcons, actIcons, inputStyle } from './CRMComponents';
 
@@ -149,10 +149,10 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}><Mail size={13} color="var(--text-dim)" />{lead.email || '—'}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginTop: '0.8rem', fontSize: '0.78rem', color: 'var(--text-dim)' }}>
-          <div>📚 {lead.batch_interest || lead.Course?.title || '—'}</div>
-          <div>💰 ৳{parseFloat(lead.deal_value || 0).toLocaleString()}</div>
-          <div>🔗 {lead.source}</div>
-          <div>📅 {daysAge}d ago</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Book size={13} /> {lead.batch_interest || lead.Course?.title || '—'}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><DollarSign size={13} /> ৳{parseFloat(lead.deal_value || 0).toLocaleString()}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Link size={13} /> {lead.source}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={13} /> {daysAge}d ago</div>
         </div>
         {lead.notes && <div style={{ marginTop: '0.8rem', padding: '0.6rem', background: 'var(--glass)', borderRadius: '8px', fontSize: '0.78rem', color: 'var(--text-dim)', borderLeft: '3px solid var(--border)' }}>{lead.notes}</div>}
       </div>
@@ -171,7 +171,7 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
           </select>
         )}
         {selectedCourse && (!selectedCourse.Batches || selectedCourse.Batches.length === 0) && (
-          <p style={{ fontSize: '0.7rem', color: '#f59e0b', marginTop: '0.3rem' }}>⚠ No active batches for this course</p>
+          <p style={{ fontSize: '0.7rem', color: '#f59e0b', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '4px' }}><XCircle size={12} /> No active batches for this course</p>
         )}
       </div>
 
@@ -187,8 +187,8 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
         </div>
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexDirection: 'column' }}>
             {!['fees_pending', 'payment_rejected', 'successful', 'lost'].includes(lead.status) && (
-              <button onClick={() => setShowEnrollForm(prev => !prev)} disabled={!lead.course_id} style={{ padding: '0.6rem', background: lead.course_id ? '#06b6d4' : '#6b7280', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem', cursor: lead.course_id ? 'pointer' : 'not-allowed', opacity: lead.course_id ? 1 : 0.6 }}>
-                {showEnrollForm ? 'Hide Enrollment Form' : '📝 Enroll → Add Student Details'}
+              <button onClick={() => setShowEnrollForm(prev => !prev)} disabled={!lead.course_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '0.6rem', background: lead.course_id ? '#06b6d4' : '#6b7280', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '0.8rem', cursor: lead.course_id ? 'pointer' : 'not-allowed', opacity: lead.course_id ? 1 : 0.6 }}>
+                {showEnrollForm ? 'Hide Enrollment Form' : <><ClipboardEdit size={16} /> Enroll → Add Student Details</>}
               </button>
             )}
             {showEnrollForm && !['fees_pending', 'payment_rejected', 'successful', 'lost'].includes(lead.status) && (
@@ -271,7 +271,7 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
             )}
             {lead.status === 'fees_pending' && (
               <div style={{ padding: '0.8rem', background: '#f59e0b10', border: '1px solid #f59e0b30', borderRadius: '8px' }}>
-                <p style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: '700', marginBottom: '0.3rem' }}>⏳ Waiting for Fee Collection</p>
+                <p style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: '700', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Hourglass size={14} /> Waiting for Fee Collection</p>
               <p style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>Go to <strong>Finance → POS</strong> to collect fees. Student profile is already created and the lead will move to successful once the invoice is fully paid.</p>
               </div>
             )}
@@ -283,13 +283,13 @@ const LeadPanel = ({ lead, onClose, onRefresh, courses }) => {
             )}
             {lead.status === 'successful' && (
             <div style={{ padding: '0.8rem', background: '#10b98110', border: '1px solid #10b98130', borderRadius: '8px' }}>
-              <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '700' }}>🏆 Sale Complete — Student Created & Fees Collected</p>
+              <p style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}><Trophy size={14} color="#10b981" /> Sale Complete — Student Created & Fees Collected</p>
             </div>
           )}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {!['lost', 'successful'].includes(lead.status) && (
-              <button onClick={() => updateStatus('lost')} style={{ flex: 1, padding: '0.5rem', background: '#ef444415', color: '#ef4444', border: '1px solid #ef444430', borderRadius: '8px', fontWeight: '700', fontSize: '0.72rem', cursor: 'pointer' }}>
-                ✗ Mark Lost
+              <button onClick={() => updateStatus('lost')} style={{ flex: 1, padding: '0.5rem', background: '#ef444415', color: '#ef4444', border: '1px solid #ef444430', borderRadius: '8px', fontWeight: '700', fontSize: '0.72rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                <XCircle size={14} /> Mark Lost
               </button>
             )}
           </div>
@@ -345,10 +345,10 @@ const LeadCard = ({ lead, onClick }) => {
           <ScoreBadge score={lead.score || 0} />
           <PriorityBadge priority={lead.priority} />
         </div>
-        {daysSince !== null && <span style={{ fontSize: '0.55rem', color: daysSince > 3 ? '#ef4444' : 'var(--text-dim)', fontWeight: '600' }}>{daysSince === 0 ? '🟢 Today' : `${daysSince}d`}</span>}
+        {daysSince !== null && <span style={{ fontSize: '0.55rem', color: daysSince > 3 ? '#ef4444' : 'var(--text-dim)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '2px' }}>{daysSince === 0 ? <><Circle size={6} fill="#10b981" color="#10b981" /> Today</> : `${daysSince}d`}</span>}
       </div>
       <p style={{ fontWeight: '700', fontSize: '0.88rem', marginBottom: '0.2rem' }}>{lead.name}</p>
-      {(lead.batch_interest || lead.Course?.title) && <p style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginBottom: '0.3rem' }}>📚 {lead.Course?.title || lead.batch_interest}</p>}
+      {(lead.batch_interest || lead.Course?.title) && <p style={{ fontSize: '0.68rem', color: 'var(--text-dim)', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '4px' }}><Book size={12} /> {lead.Course?.title || lead.batch_interest}</p>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {lead.deal_value > 0 && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#10b981' }}>৳{parseFloat(lead.deal_value).toLocaleString()}</span>}
         <span style={{ fontSize: '0.6rem', color: 'var(--text-dim)', background: 'var(--glass)', padding: '1px 6px', borderRadius: '6px' }}>{lead.source || '—'}</span>
@@ -395,7 +395,7 @@ const PipelineTab = ({ leads, courses, onRefresh }) => {
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
             <input placeholder="Search leads..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, paddingLeft: '2rem', width: '100%' }} />
           </div>
-          {lostCount > 0 && <span style={{ fontSize: '0.7rem', color: '#ef4444', background: '#ef444410', padding: '4px 10px', borderRadius: '8px' }}>❌ {lostCount} lost</span>}
+          {lostCount > 0 && <span style={{ fontSize: '0.7rem', color: '#ef4444', background: '#ef444410', padding: '4px 10px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}><XCircle size={12} /> {lostCount} lost</span>}
         </div>
         <button className="btn-primary" onClick={() => setShowForm(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}>
           <Plus size={16} /> New Lead
@@ -404,7 +404,7 @@ const PipelineTab = ({ leads, courses, onRefresh }) => {
 
       {showForm && (
         <div style={{ marginBottom: '1.2rem', padding: '1.5rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px' }}>
-          <h4 style={{ marginBottom: '1rem', fontSize: '0.95rem', fontWeight: '700' }}>➕ New Lead</h4>
+          <h4 style={{ marginBottom: '1rem', fontSize: '0.95rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}><Plus size={16} color="var(--primary)" /> New Lead</h4>
           <form onSubmit={handleAdd} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.7rem' }}>
             <input required placeholder="Full Name *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
             <input placeholder="Phone" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} style={inputStyle} />

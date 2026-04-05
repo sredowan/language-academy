@@ -321,6 +321,7 @@ select option {
 }
 .pg-4 { grid-template-columns: repeat(4, 1fr); }
 .pg-5 { grid-template-columns: repeat(5, 1fr); }
+.pg-6 { grid-template-columns: repeat(6, 1fr); }
 .pg-3 { grid-template-columns: repeat(3, 1fr); }
 
 .pulse-card {

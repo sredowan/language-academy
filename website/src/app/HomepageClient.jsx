@@ -40,22 +40,22 @@ export default function HomepageClient({ courses, blogs }) {
             <AnimateOnScroll variant="slide-left">
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full bg-blue-100/60 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-primary shadow-sm mb-6">
-                  BANGLADESH&apos;S TRUSTED LANGUAGE INSTITUTE
+                  #1 PTE COACHING CENTRE IN BANGLADESH
                 </span>
                 
                 <h1 className="text-balance text-4xl font-extrabold leading-[1.15] text-slate-900 sm:text-5xl lg:text-[3.5rem] tracking-tight">
-                  Best IELTS, PTE & <br className="hidden md:block"/>
-                  Spoken English <br className="hidden md:block"/>
-                  Classes in Bangladesh
+                  Best PTE Coaching <br className="hidden md:block"/>
+                  Centre in Dhaka, <br className="hidden md:block"/>
+                  Bangladesh
                 </h1>
                 
                 <p className="mt-6 text-lg leading-relaxed text-slate-600 max-w-xl">
-                  Language Academy Bangladesh helps students and professionals improve their English proficiency for higher education, migration, career growth, and global opportunities. Learn from expert instructors through structured classes, mock tests, and practical speaking sessions.
+                  Language Academy is the leading PTE coaching centre in Dhaka, Bangladesh — offering expert-led PTE Academic preparation with AI-scored mock tests, small-batch classes, and guaranteed score improvement. We also offer IELTS preparation, Spoken English, and study abroad consulting — both online and offline.
                 </p>
                 
                 {/* Topic Pills */}
                 <div className="mt-8 flex flex-wrap gap-3">
-                  {["IELTS Preparation", "PTE Coaching", "Spoken English", "Study Abroad Support"].map(pill => (
+                  {["PTE Academic", "IELTS Preparation", "Spoken English", "Online & Offline Classes"].map(pill => (
                     <span key={pill} className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-primary shadow-sm">
                       {pill}
                     </span>
@@ -78,13 +78,13 @@ export default function HomepageClient({ courses, blogs }) {
                 <div className="rounded-[32px] bg-primary p-8 sm:p-12 text-white h-full relative overflow-hidden">
                   <div className="absolute top-0 right-0 -mt-10 -mr-10 h-64 w-64 rounded-full bg-white/10 blur-3xl mix-blend-overlay"></div>
                   
-                  <p className="text-sm font-medium text-white/80 tracking-wide mb-4">Language Academy Bangladesh</p>
+                  <p className="text-sm font-medium text-white/80 tracking-wide mb-4">Language Academy — Dhaka, Bangladesh</p>
                   <h2 className="text-3xl sm:text-4xl font-extrabold leading-tight mb-10 text-balance">
-                    Achieve your<br/>target score<br/>with confidence
+                    Get your PTE<br/>target score<br/>— guaranteed
                   </h2>
                   
                   <div className="space-y-4 relative z-10">
-                    {["Small batch interactive classes", "Experienced trainers and mock tests", "Dhaka-focused, Bangladesh-friendly support"].map((item, i) => (
+                    {["PTE, IELTS & Spoken English coaching", "AI-scored mock tests & analytics", "Online + Offline classes in Dhaka"].map((item, i) => (
                       <div key={i} className="flex items-center gap-4 rounded-2xl bg-white/10 p-4 border border-white/5 backdrop-blur-sm">
                         <Check size={20} className="text-white shrink-0" strokeWidth={3} />
                         <span className="font-medium text-sm sm:text-base">{item}</span>
@@ -102,9 +102,9 @@ export default function HomepageClient({ courses, blogs }) {
       <section className="py-20 bg-white">
         <div className="container-shell">
           <div className="mb-12 text-center max-w-2xl mx-auto">
-            <span className="text-sm font-bold uppercase tracking-widest text-primary mb-3 block">Upcoming Batches</span>
-            <h2 className="text-3xl font-extrabold text-slate-900 md:text-4xl">Premium tracks ready for enrollment.</h2>
-            <p className="mt-4 text-slate-500">Secure your seat in our upcoming small-batch intakes.</p>
+            <span className="text-sm font-bold uppercase tracking-widest text-primary mb-3 block">PTE, IELTS & More</span>
+            <h2 className="text-3xl font-extrabold text-slate-900 md:text-4xl">Expert-led courses — enroll in the next batch.</h2>
+            <p className="mt-4 text-slate-500">PTE Academic, IELTS preparation, and Spoken English. Small batches, max 12 students. Online & offline in Dhaka.</p>
           </div>
           
           {courses.length > 0 ? (
@@ -134,21 +134,21 @@ export default function HomepageClient({ courses, blogs }) {
           <div className="grid gap-12 lg:grid-cols-2 items-center">
             <AnimateOnScroll variant="slide-left">
               <div className="rounded-[2rem] overflow-hidden shadow-2xl shadow-slate-200/50">
-                <img src="/hero_banner.png" alt="Student studying" className="w-full h-[400px] object-cover" />
+                <img src="/hero_banner.png" alt="PTE coaching centre in Dhaka - Language Academy Bangladesh" className="w-full h-[400px] object-cover" />
               </div>
             </AnimateOnScroll>
             <AnimateOnScroll variant="slide-right">
               <div>
                 <h2 className="text-3xl font-extrabold text-primary md:text-4xl leading-tight mb-6">
-                  Best PTE Classes in Dhaka –<br className="hidden md:block"/>
-                  Language Academy Bangladesh
+                  Best PTE Coaching Centre <br className="hidden md:block"/>
+                  in Dhaka, Bangladesh
                 </h2>
                 <div className="space-y-6 text-slate-600 leading-relaxed">
                   <p>
-                    Are you looking for the best PTE classes in Dhaka? Language Academy Bangladesh provides top-quality PTE exam preparation, helping you achieve your desired scores quickly and confidently. Our expert trainers, interactive classes, and proven teaching techniques make us the leading provider of PTE coaching in Bangladesh.
+                    Looking for the <strong>best PTE coaching in Dhaka</strong>? Language Academy is Bangladesh&apos;s top-rated PTE coaching centre — helping students achieve their target PTE Academic scores through expert trainers, AI-scored mock tests, and small-batch interactive classes. We offer both online and offline PTE courses from our Dhanmondi campus.
                   </p>
                   <p>
-                    PTE (Pearson Test of English) is an internationally recognized English proficiency test trusted by universities, employers, and immigration authorities worldwide. It evaluates your listening, reading, writing, and speaking skills. PTE is computer-based, quick, fair, and delivers fast results — typically within 48 hours.
+                    Beyond PTE, we also offer <strong>IELTS preparation</strong>, <strong>Spoken English courses</strong>, and <strong>study abroad consulting</strong> — making us a complete English language academy for students and professionals in Bangladesh. Whether you need PTE for migration, university admissions, or career growth, we have a program for you.
                   </p>
                 </div>
               </div>
@@ -204,7 +204,7 @@ export default function HomepageClient({ courses, blogs }) {
             
             <AnimateOnScroll variant="slide-right">
               <div className="rounded-[2rem] overflow-hidden shadow-2xl relative group">
-                <img src="/pte_course.png" alt="PTE Format" className="w-full h-[400px] object-cover group-hover:scale-105 transition-transform duration-700" />
+                <img src="/pte_course.png" alt="PTE exam format and structure - Language Academy Dhaka" className="w-full h-[400px] object-cover group-hover:scale-105 transition-transform duration-700" />
                 <div className="absolute inset-0 bg-accent/20 mix-blend-overlay"></div>
               </div>
             </AnimateOnScroll>
@@ -278,24 +278,24 @@ export default function HomepageClient({ courses, blogs }) {
             <AnimateOnScroll variant="slide-left">
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full bg-blue-100/60 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-primary shadow-sm mb-6">
-                  WHY US
+                  WHY CHOOSE US
                 </span>
                 
                 <h2 className="text-4xl font-extrabold text-slate-900 md:text-5xl tracking-tight mb-6">
-                  Why Language Academy<br/>Bangladesh stands out
+                  Why Language Academy<br/>is Dhaka&apos;s #1 choice
                 </h2>
                 
                 <p className="text-lg leading-relaxed text-slate-600 mb-8 max-w-lg">
-                  Our approach combines practical learning, score-focused training, and a supportive classroom environment.
+                  We specialize in PTE Academic coaching with proven results — plus IELTS, Spoken English, and study abroad support. Online and offline classes available.
                 </p>
                 
                 <ul className="space-y-4">
                   {[
-                    "Diagnostic evaluation before class placement",
-                    "Structured syllabus with measurable progress",
-                    "One-to-one feedback sessions",
-                    "Updated materials for IELTS and PTE preparation",
-                    "Ideal for students planning to study abroad from Bangladesh"
+                    "Expert PTE & IELTS trainers with proven track records",
+                    "AI-powered mock tests with instant score analysis",
+                    "Small batches (max 12 students) for personalized coaching",
+                    "Both online and offline classes from Dhanmondi, Dhaka",
+                    "PTE, IELTS, Spoken English & study abroad consulting"
                   ].map((item, i) => (
                     <li key={i} className="flex gap-4 items-center">
                       <div className="flex h-2 w-2 shrink-0 items-center justify-center rounded-full bg-primary shadow-sm mt-0.5" />
@@ -312,8 +312,8 @@ export default function HomepageClient({ courses, blogs }) {
                 <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
                 
                 <div className="relative z-10 text-center md:text-left flex-1">
-                  <h3 className="text-2xl sm:text-3xl font-bold mb-3 tracking-tight">Ready to improve your English?</h3>
-                  <p className="text-white/80 text-sm sm:text-base">Join a professional course built for Bangladeshi learners.</p>
+                  <h3 className="text-2xl sm:text-3xl font-bold mb-3 tracking-tight">Ready to ace your PTE or IELTS?</h3>
+                  <p className="text-white/80 text-sm sm:text-base">Join Bangladesh&apos;s top-rated coaching centre — online or offline in Dhaka.</p>
                 </div>
                 
                 <div className="relative z-10 shrink-0">
@@ -337,11 +337,11 @@ export default function HomepageClient({ courses, blogs }) {
                <Target size={40} className="text-white" />
             </div>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-6">
-              Get Enrolled & Enjoy <br className="hidden md:block"/>
+              Enroll in PTE or IELTS & Get <br className="hidden md:block"/>
               <span className="text-amber-300">Unlimited Practice</span>
             </h2>
             <p className="mx-auto max-w-2xl text-lg md:text-xl text-white/90 leading-relaxed mb-10">
-              Your success is our priority. Get unlimited access to comprehensive study materials, trainer-led sessions, and AI-scored mock tests until you reach your target score. Don't settle for less!
+              Whether you&apos;re preparing for PTE Academic, IELTS, or improving your Spoken English — get unlimited access to AI-scored mock tests, expert-led sessions, and comprehensive study materials until you hit your target score.
             </p>
             <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
                <button onClick={() => handleBook()} className="bg-white text-primary hover:bg-slate-50 hover:scale-105 px-8 py-4 sm:px-10 sm:py-5 font-extrabold shadow-xl shadow-black/10 transition-all rounded-full text-base sm:text-lg w-full sm:w-auto">

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Upload, Download, CheckSquare, Square } from 'lucide-react';
 import api from '../../services/api';
 import { inputStyle, stageColors, stageLabels, stageIcons } from './CRMComponents';
 
@@ -9,17 +9,32 @@ const ContactsTab = ({ contacts, onRefresh }) => {
   const [form, setForm] = useState({ name: '', phone: '', email: '', company: '', source: 'Walk-in', notes: '' });
   const [saving, setSaving] = useState(false);
   const [statusSavingId, setStatusSavingId] = useState(null);
+  
   const [search, setSearch] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [leadStatusFilter, setLeadStatusFilter] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
+  
+  // Bulk features state
+  const [selectedContacts, setSelectedContacts] = useState([]);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkActionStage, setBulkActionStage] = useState('');
 
   const leadStages = ['new', 'contacted', 'interested', 'trial', 'enrolled', 'fees_pending', 'payment_rejected', 'successful', 'lost'];
-
   const sources = [...new Set(contacts.map(c => c.source).filter(Boolean))];
 
   const filtered = contacts.filter(c => {
     if (search && !c.name?.toLowerCase().includes(search.toLowerCase()) && !c.email?.toLowerCase().includes(search.toLowerCase()) && !c.phone?.includes(search)) return false;
     if (sourceFilter && c.source !== sourceFilter) return false;
+    if (leadStatusFilter) {
+      if (leadStatusFilter === 'None') {
+        if (c.CurrentLead) return false;
+      } else {
+        if (!c.CurrentLead || c.CurrentLead.status !== leadStatusFilter) return false;
+      }
+    }
     return true;
   });
 
@@ -66,6 +81,67 @@ const ContactsTab = ({ contacts, onRefresh }) => {
     }
   };
 
+  // Bulk Actions
+  const toggleSelection = (id) => {
+    setSelectedContacts(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleAll = () => {
+    if (selectedContacts.length === filtered.length && filtered.length > 0) setSelectedContacts([]);
+    else setSelectedContacts(filtered.map(c => c.id));
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (!bulkActionStage) return alert('Select a stage first');
+    setSaving(true);
+    try {
+      await api.patch('/crm/contacts/bulk-status', { contactIds: selectedContacts, status: bulkActionStage });
+      setSelectedContacts([]); onRefresh();
+    } catch { alert('Failed to update bulk status'); }
+    finally { setSaving(false); setBulkActionStage(''); }
+  };
+
+  // CSV Upload
+  const downloadSampleCSV = () => {
+    const url = window.URL.createObjectURL(new Blob(['Name,Phone,Email,Source,Notes\nJane Doe,0170000000,jane@example.com,Facebook,Interested in PTE'], { type: 'text/csv' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'sample_contacts.csv'; a.click();
+  };
+
+  const handleCSVUpload = async (e) => {
+    e.preventDefault();
+    if (!bulkFile) return alert('Please select a file to upload');
+    setBulkUploading(true);
+    try {
+      const fileText = await bulkFile.text();
+      const rows = fileText.split('\n').filter(r => r.trim());
+      if (rows.length < 2) throw new Error('File must contain at least one data row and headers.');
+      
+      const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+      const payload = [];
+      
+      for(let i = 1; i < rows.length; i++) {
+        // Simple CSV parse. (Fails on commas inside quotes, but fine for basic names/phones)
+        const cols = rows[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        const obj = {};
+        headers.forEach((h, idx) => { obj[h] = cols[idx]; });
+        if (obj.name) payload.push(obj);
+      }
+      
+      const res = await api.post('/crm/contacts/bulk-upload', { contacts: payload });
+      alert('✅ ' + res.data.message);
+      setShowBulkUpload(false); setBulkFile(null); onRefresh();
+    } catch (e) { alert(e.message || 'Failed to upload contacts'); }
+    finally { setBulkUploading(false); }
+  };
+
+  const gridStyle = { 
+    display: 'grid', 
+    gridTemplateColumns: '40px 1.7fr 1.1fr 1.5fr 1fr 1fr 0.9fr 1.25fr 0.7fr', 
+    gap: '0.4rem', 
+    padding: '0.6rem 1rem', 
+    alignItems: 'center' 
+  };
+
   return (
     <div>
       {/* Header */}
@@ -74,10 +150,34 @@ const ContactsTab = ({ contacts, onRefresh }) => {
           <h3 style={{ fontSize: '1.05rem', fontWeight: '700' }}>Contact Directory</h3>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{filtered.length} of {contacts.length} contacts</p>
         </div>
-        <button className="btn-primary" onClick={() => { resetForm(); setShowForm(s => !s); }} style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Plus size={16} /> Add Contact
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn-secondary" onClick={() => setShowBulkUpload(s => !s)} style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem', border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', padding: '0.5rem 1rem', borderRadius: '8px', color: 'var(--text)' }}>
+            <Upload size={16} /> Bulk Upload
+          </button>
+          <button className="btn-primary" onClick={() => { resetForm(); setShowForm(s => !s); }} style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Plus size={16} /> Add Contact
+          </button>
+        </div>
       </div>
+
+      {/* Floating Action Bar for Bulk Selecting */}
+      {selectedContacts.length > 0 && (
+        <div style={{ position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '0.8rem 1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', zIndex: 1000, boxShadow: '0 10px 40px rgba(0,0,0,0.3)' }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)' }}>{selectedContacts.length} Selected</span>
+          <div style={{ height: '24px', width: '1px', background: 'var(--border)' }}></div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Action:</span>
+            <select value={bulkActionStage} onChange={e => setBulkActionStage(e.target.value)} style={{ ...inputStyle, padding: '0.4rem 0.8rem', fontSize: '0.8rem', width: '160px' }}>
+              <option value="">Update Pipeline Stage</option>
+              {leadStages.map(s => <option key={s} value={s}>{stageLabels[s] || s}</option>)}
+            </select>
+            <button onClick={handleBulkStatusUpdate} disabled={saving || !bulkActionStage} className="btn-primary" style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}>
+              {saving ? 'Saving...' : 'Apply'}
+            </button>
+          </div>
+          <button onClick={() => setSelectedContacts([])} style={{ background: 'transparent', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={16} /></button>
+        </div>
+      )}
 
       {/* Search + Filters */}
       <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '1rem', alignItems: 'center' }}>
@@ -85,16 +185,41 @@ const ContactsTab = ({ contacts, onRefresh }) => {
           <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
           <input placeholder="Search by name, email, phone..." value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, paddingLeft: '2rem', width: '100%' }} />
         </div>
-        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ ...inputStyle, width: '180px' }}>
+        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={{ ...inputStyle, width: '160px' }}>
           <option value="">All Sources</option>
           {sources.map(s => <option key={s}>{s}</option>)}
         </select>
-        {(search || sourceFilter) && (
-          <button onClick={() => { setSearch(''); setSourceFilter(''); }} style={{ padding: '0.5rem 0.8rem', background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.75rem' }}>
+        <select value={leadStatusFilter} onChange={e => setLeadStatusFilter(e.target.value)} style={{ ...inputStyle, width: '160px' }}>
+          <option value="">All Lead Stages</option>
+          <option value="None">No Lead</option>
+          {leadStages.map(s => <option key={s} value={s}>{stageLabels[s] || s}</option>)}
+        </select>
+        {(search || sourceFilter || leadStatusFilter) && (
+          <button onClick={() => { setSearch(''); setSourceFilter(''); setLeadStatusFilter(''); }} style={{ padding: '0.5rem 0.8rem', background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-dim)', cursor: 'pointer', fontSize: '0.75rem' }}>
             <X size={12} /> Clear
           </button>
         )}
       </div>
+
+      {/* CSV Bulk Upload Modal */}
+      {showBulkUpload && (
+        <div style={{ marginBottom: '1.2rem', padding: '1.5rem', background: 'var(--glass)', border: '1px solid var(--primary)', borderRadius: '12px' }}>
+           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}><Upload size={16} color="var(--primary)" /> Bulk Upload Contacts</h4>
+            <X size={16} style={{ cursor: 'pointer', color: 'var(--text-dim)' }} onClick={() => setShowBulkUpload(false)} />
+          </div>
+          <div style={{ padding: '1rem', background: 'var(--bg-card)', borderRadius: '8px', marginBottom: '1rem' }}>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.8rem' }}>Upload a CSV file with the standard headers (Name, Phone, Email, Source, Notes). New Contacts and initial Pipeline Leads will be automatically created.</p>
+            <button type="button" onClick={downloadSampleCSV} style={{ padding: '0.4rem 0.8rem', background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', color: 'var(--text)', cursor: 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Download size={14} /> Download Sample CSV
+            </button>
+          </div>
+          <form onSubmit={handleCSVUpload} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <input required type="file" accept=".csv" onChange={e => setBulkFile(e.target.files[0])} style={{ padding: '0.5rem', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text)' }} />
+            <button type="submit" disabled={bulkUploading || !bulkFile} className="btn-primary" style={{ padding: '0.6rem 1.5rem' }}>{bulkUploading ? 'Uploading...' : 'Upload & Import'}</button>
+          </form>
+        </div>
+      )}
 
       {/* Add/Edit Form */}
       {showForm && (
@@ -122,7 +247,10 @@ const ContactsTab = ({ contacts, onRefresh }) => {
 
       {/* Contact Table */}
       <div className="glass-morphism" style={{ padding: '0.5rem', borderRadius: '12px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.1fr 1.5fr 1fr 1fr 0.9fr 1.25fr 0.7fr', gap: '0.5rem', padding: '0.6rem 1rem', fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', fontWeight: '700', letterSpacing: '0.5px' }}>
+        <div style={{ ...gridStyle, fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', fontWeight: '700', letterSpacing: '0.5px' }}>
+          <div onClick={toggleAll} style={{ cursor: 'pointer', marginLeft: '5px' }}>
+             {selectedContacts.length === filtered.length && filtered.length > 0 ? <CheckSquare size={16} color="var(--primary)" /> : <Square size={16} />}
+          </div>
           <span>Name</span><span>Phone</span><span>Email</span><span>Source</span><span>Company</span><span>Since</span><span>Lead Position</span><span>Actions</span>
         </div>
         {filtered.length === 0 ? (
@@ -130,9 +258,15 @@ const ContactsTab = ({ contacts, onRefresh }) => {
             {contacts.length === 0 ? 'No contacts yet. They are auto-created when leads are enrolled.' : 'No contacts match your filters.'}
           </p>
         ) : filtered.map(c => (
-          <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.1fr 1.5fr 1fr 1fr 0.9fr 1.25fr 0.7fr', gap: '0.5rem', padding: '0.65rem 1rem', borderBottom: '1px solid var(--border)', fontSize: '0.82rem', alignItems: 'center', transition: 'background 0.15s' }}
+          <div key={c.id} style={{ ...gridStyle, borderBottom: '1px solid var(--border)', fontSize: '0.82rem', transition: 'background 0.15s', background: selectedContacts.includes(c.id) ? 'var(--glass)' : 'transparent' }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--glass)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            onMouseLeave={e => e.currentTarget.style.background = selectedContacts.includes(c.id) ? 'var(--glass)' : 'transparent'}>
+            
+            {/* Checkbox */}
+            <div onClick={() => toggleSelection(c.id)} style={{ cursor: 'pointer', marginLeft: '5px' }}>
+              {selectedContacts.includes(c.id) ? <CheckSquare size={16} color="var(--primary)" /> : <Square size={16} color="var(--text-dim)" opacity={0.5} />}
+            </div>
+
             <div>
               <span style={{ fontWeight: '600' }}>{c.name}</span>
               {c.notes && <p style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginTop: '0.1rem' }}>{c.notes.substring(0, 40)}{c.notes.length > 40 ? '...' : ''}</p>}

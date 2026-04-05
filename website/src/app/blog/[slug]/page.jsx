@@ -2,10 +2,11 @@ import React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar, User, ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin } from "lucide-react";
+import JsonLd, { breadcrumbSchema } from "@/components/JsonLd";
 
 async function getBlogDetails(slug) {
   try {
-    const res = await fetch(`http://localhost:5000/api/public/blog/${slug}`, { next: { revalidate: 60 } });
+    const res = await fetch(`http://localhost:3000/api/public/blog/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) { if (res.status === 404) return null; throw new Error("Failed"); }
     return res.json();
   } catch (error) { console.error("Error:", error); return null; }
@@ -13,7 +14,7 @@ async function getBlogDetails(slug) {
 
 async function getRelatedBlogs() {
   try {
-    const res = await fetch("http://localhost:5000/api/public/blog", { next: { revalidate: 60 } });
+    const res = await fetch("http://localhost:3000/api/public/blog", { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();
     return data.slice(0, 3);
@@ -23,7 +24,20 @@ async function getRelatedBlogs() {
 export async function generateMetadata({ params }) {
   const blog = await getBlogDetails(params.slug);
   if (!blog) return { title: "Post Not Found" };
-  return { title: `${blog.title} | Language Academy Blog`, description: blog.excerpt };
+  return {
+    title: blog.title,
+    description: blog.excerpt || `Read ${blog.title} on Language Academy Blog.`,
+    alternates: { canonical: `https://languageacademy.com.bd/blog/${params.slug}` },
+    openGraph: {
+      type: "article",
+      title: blog.title,
+      description: blog.excerpt || `Read ${blog.title} on Language Academy Blog.`,
+      url: `https://languageacademy.com.bd/blog/${params.slug}`,
+      images: [{ url: blog.image_url || "/hero_banner.png", width: 1200, height: 630, alt: blog.title }],
+      publishedTime: blog.published_at,
+      authors: ["Language Academy Bangladesh"],
+    },
+  };
 }
 
 export default async function BlogDetailPage({ params }) {
@@ -34,6 +48,24 @@ export default async function BlogDetailPage({ params }) {
   const filtered = relatedBlogs.filter((b) => b.slug !== params.slug).slice(0, 2);
 
   return (
+    <>
+    <JsonLd data={breadcrumbSchema([
+      { name: "Home", url: "https://languageacademy.com.bd" },
+      { name: "Blog", url: "https://languageacademy.com.bd/blog" },
+      { name: blog.title, url: `https://languageacademy.com.bd/blog/${blog.slug}` },
+    ])} />
+    <JsonLd data={{
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": blog.title,
+      "description": blog.excerpt,
+      "image": blog.image_url || "https://languageacademy.com.bd/hero_banner.png",
+      "datePublished": blog.published_at,
+      "dateModified": blog.updated_at || blog.published_at,
+      "author": { "@type": "Organization", "name": "Language Academy Bangladesh", "url": "https://languageacademy.com.bd" },
+      "publisher": { "@type": "Organization", "name": "Language Academy Bangladesh", "logo": { "@type": "ImageObject", "url": "https://languageacademy.com.bd/logo-optimized.png" } },
+      "mainEntityOfPage": { "@type": "WebPage", "@id": `https://languageacademy.com.bd/blog/${blog.slug}` },
+    }} />
     <div className="pb-24">
       <article className="container-shell max-w-4xl pt-8">
         {/* Back Link */}
@@ -108,5 +140,6 @@ export default async function BlogDetailPage({ params }) {
         )}
       </article>
     </div>
+    </>
   );
 }

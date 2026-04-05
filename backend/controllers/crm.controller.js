@@ -17,6 +17,7 @@ const { fn, col, literal, Op } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const automationService = require('../services/automation.service');
 const communicationService = require('../services/communication.service');
+const fbCapi = require('../services/facebookCapi.service');
 
 const normalizeEducationDetails = (value) => {
   if (Array.isArray(value)) return value;
@@ -113,6 +114,7 @@ exports.getAllLeads = async (req, res) => {
 };
 
 exports.createLead = async (req, res) => {
+  const t = await sequelize.transaction();
   try {
     const { name, phone, email, source, batch_interest, notes, counselor_id, priority, expected_close, course_id } = req.body;
 
@@ -120,7 +122,7 @@ exports.createLead = async (req, res) => {
     let deal_value = req.body.deal_value || 0;
     let courseTitle = batch_interest || '';
     if (course_id) {
-      const course = await Course.findByPk(course_id, { attributes: ['title', 'base_fee'] });
+      const course = await Course.findByPk(course_id, { attributes: ['title', 'base_fee'], transaction: t });
       if (course) {
         deal_value = course.base_fee;
         courseTitle = course.title;
@@ -136,14 +138,46 @@ exports.createLead = async (req, res) => {
       priority: priority || 'medium',
       expected_close: expected_close || null,
       score: calculateLeadScore({ source, phone, email, batch_interest: courseTitle }),
-    });
+    }, { transaction: t });
+
+    let contact = null;
+    if (email) {
+      contact = await Contact.findOne({ where: { email, branch_id: req.branchId }, transaction: t });
+    }
+    if (!contact) {
+      contact = await Contact.create({
+        branch_id: req.branchId,
+        name, phone, email, source, notes,
+      }, { transaction: t });
+    }
+
+    await Opportunity.create({
+      branch_id: req.branchId,
+      title: `${lead.name} – ${courseTitle || 'Initial Inquiry'}`,
+      contact_id: contact.id, lead_id: lead.id,
+      value: deal_value || 0,
+      stage: 'qualification',
+      course_interest: courseTitle || batch_interest,
+      assigned_to: counselor_id || (req.user ? req.user.id : null),
+      expected_close: expected_close || null,
+    }, { transaction: t });
+
+    await t.commit();
     res.status(201).json(lead);
 
     automationService.processTrigger('new_lead', {
       name: lead.name, phone: lead.phone,
       batch_interest: lead.batch_interest, branch_id: req.branchId
     }).catch(() => {});
+
+    // Fire Facebook CAPI 'Lead' event (non-blocking)
+    fbCapi.sendLeadEvent(req, {
+      name: lead.name, email: lead.email, phone: lead.phone,
+      courseName: courseTitle || 'General Enquiry',
+      value: deal_value,
+    }).catch(() => {});
   } catch (error) {
+    if (t) await t.rollback();
     res.status(500).json({ error: error.message });
   }
 };
@@ -388,6 +422,12 @@ exports.enrollLead = async (req, res) => {
       message: `Student, enrollment, and invoice created for ${course.title}. Invoice ${invoiceNo} is ready for POS collection.`,
       student, enrollment, invoice, opportunity, contact,
     });
+
+    // Fire Facebook CAPI 'CompleteRegistration' event (non-blocking)
+    fbCapi.sendRegistrationEvent(req, {
+      name: fullName, email: primaryEmail, phone: mobile_no || lead.phone,
+      courseName: course.title, value: course.base_fee,
+    }).catch(() => {});
   } catch (error) {
     await t.rollback();
     console.error('[CRM] Enroll Lead Error:', error);
@@ -578,6 +618,94 @@ exports.deleteContact = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.bulkUpdateContactLeadStatus = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { contactIds, status } = req.body;
+    if (!contactIds || !contactIds.length || !status) {
+      return res.status(400).json({ error: 'Missing contactIds or status' });
+    }
+
+    const opportunities = await Opportunity.findAll({
+      where: { branch_id: req.branchId, contact_id: { [Op.in]: contactIds } },
+      attributes: ['lead_id'],
+      transaction: t
+    });
+
+    const leadIds = [...new Set(opportunities.map(o => o.lead_id).filter(Boolean))];
+
+    if (leadIds.length > 0) {
+      await Lead.update(
+        { status, last_activity_at: new Date() },
+        { where: { branch_id: req.branchId, id: { [Op.in]: leadIds } }, transaction: t }
+      );
+    }
+
+    await t.commit();
+    res.json({ message: `Successfully updated ${leadIds.length} leads` });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.bulkUploadContacts = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { contacts } = req.body;
+    if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
+      return res.status(400).json({ error: 'No valid contacts provided' });
+    }
+
+    let successCount = 0;
+    for (const item of contacts) {
+      const { name, phone, email, source, notes } = item;
+      if (!name) continue; // Skip rows without name
+
+      // 1. Create Lead
+      const lead = await Lead.create({
+        branch_id: req.branchId,
+        name, phone, email, source: source || 'Imported', notes,
+        priority: 'medium',
+        score: calculateLeadScore({ source: source || 'Imported', phone, email })
+      }, { transaction: t });
+
+      // 2. Create or Find Contact
+      let contact = null;
+      if (email) {
+        contact = await Contact.findOne({ where: { email, branch_id: req.branchId }, transaction: t });
+      }
+      if (!contact && phone) {
+        contact = await Contact.findOne({ where: { phone, branch_id: req.branchId }, transaction: t });
+      }
+      if (!contact) {
+        contact = await Contact.create({
+          branch_id: req.branchId, name, phone, email, source: source || 'Imported', notes
+        }, { transaction: t });
+      }
+
+      // 3. Create Opportunity
+      await Opportunity.create({
+        branch_id: req.branchId,
+        title: `${lead.name} – Imported`,
+        contact_id: contact.id, lead_id: lead.id,
+        value: 0,
+        stage: 'qualification',
+        assigned_to: req.user ? req.user.id : null,
+      }, { transaction: t });
+
+      successCount++;
+    }
+
+    await t.commit();
+    res.json({ message: `Successfully imported ${successCount} contacts.` });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({ error: error.message });
+  }
+};
+
 
 // ============================================================
 //  OPPORTUNITIES (Deals)

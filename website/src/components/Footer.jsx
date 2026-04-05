@@ -58,7 +58,7 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-sm leading-7 text-slate-400">
-              Bangladesh&apos;s leading English language coaching centre. Expert-led PTE Academic, IELTS preparation, and Spoken English programs designed for students who demand measurable results.
+              Bangladesh&apos;s best PTE coaching centre. Expert-led PTE Academic preparation, IELTS coaching, and Spoken English courses in Dhaka &mdash; available both online and offline. AI-scored mock tests and small-batch classes for guaranteed score improvement.
             </p>
             {/* Social Links */}
             <div className="mt-6 flex gap-3">

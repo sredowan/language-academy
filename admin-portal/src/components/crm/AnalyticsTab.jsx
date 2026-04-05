@@ -1,5 +1,6 @@
 import React from 'react';
 import { stageColors, stageLabels, stageIcons } from './CRMComponents';
+import { TrendingUp, DollarSign, XCircle, Radar, BarChart2, GraduationCap } from 'lucide-react';
 
 const AnalyticsTab = ({ analytics }) => {
   const { funnel, source, forecast, successResults, destinationCountries } = analytics;
@@ -10,22 +11,20 @@ const AnalyticsTab = ({ analytics }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.8rem' }}>
+      <div className="pulse-grid pg-6" style={{ marginBottom: '1.5rem' }}>
         {[
-          { label: 'CONVERSION RATE', value: `${funnel?.overallConversion || 0}%`, sub: 'Lead → Successful', color: '#10b981', icon: '📈' },
-          { label: 'REAL REVENUE', value: `৳${(funnel?.successfulRevenue || 0).toLocaleString()}`, sub: 'Fees collected only', color: '#06b6d4', icon: '💰' },
-          { label: 'PAYMENT REJECTED', value: `${funnel?.paymentRejectedCount || 0}`, sub: `৳${(funnel?.rejectedRevenue || 0).toLocaleString()} lost at POS`, color: '#ef4444', icon: '🚫' },
-          { label: 'FORECAST', value: `৳${(forecast?.weightedForecast || 0).toLocaleString()}`, sub: 'Pipeline × Probability', color: '#3b82f6', icon: '🔮' },
-          { label: 'PIPELINE', value: `৳${(forecast?.totalPipelineValue || 0).toLocaleString()}`, sub: 'Open opportunities', color: '#f59e0b', icon: '📊' },
-          { label: 'SUCCESS RECORDS', value: `${totalSuccessResults}`, sub: `${totalDestinationCountries} destination updates`, color: '#8b5cf6', icon: '🎓' },
+          { label: 'CONVERSION RATE', value: `${funnel?.overallConversion || 0}%`, sub: 'Lead → Successful', c: 'c-mint', icon: <TrendingUp size={32} /> },
+          { label: 'REAL REVENUE', value: `৳${(funnel?.successfulRevenue || 0).toLocaleString()}`, sub: 'Fees collected only', c: 'c-cyan', icon: <DollarSign size={32} /> },
+          { label: 'PAYMENT REJECTED', value: `${funnel?.paymentRejectedCount || 0}`, sub: `৳${(funnel?.rejectedRevenue || 0).toLocaleString()} lost at POS`, c: 'c-rose', icon: <XCircle size={32} /> },
+          { label: 'FORECAST', value: `৳${(forecast?.weightedForecast || 0).toLocaleString()}`, sub: 'Pipeline × Probability', c: 'c-violet', icon: <Radar size={32} /> },
+          { label: 'PIPELINE', value: `৳${(forecast?.totalPipelineValue || 0).toLocaleString()}`, sub: 'Open opportunities', c: 'c-amber', icon: <BarChart2 size={32} /> },
+          { label: 'SUCCESS RECORDS', value: `${totalSuccessResults}`, sub: `${totalDestinationCountries} dest. updates`, c: 'c-cyan', icon: <GraduationCap size={32} /> },
         ].map(k => (
-          <div key={k.label} style={{ padding: '1.2rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', borderBottom: `3px solid ${k.color}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <p style={{ fontSize: '0.58rem', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.5px' }}>{k.label}</p>
-              <span>{k.icon}</span>
-            </div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: k.color, margin: '0.3rem 0 0.1rem' }}>{k.value}</h2>
-            <p style={{ fontSize: '0.68rem', color: 'var(--text-dim)' }}>{k.sub}</p>
+          <div key={k.label} className={`pulse-card ${k.c}`} style={{ padding: '24px 20px' }}>
+            <div className="pc-icon" style={{ top: '24px', right: '20px', opacity: 0.15 }}>{k.icon}</div>
+            <p className="pc-label">{k.label}</p>
+            <h3 className="pc-value" style={{ fontSize: '1.6rem' }}>{k.value}</h3>
+            <p className="pc-meta" style={{ marginTop: '6px' }}>{k.sub}</p>
           </div>
         ))}
       </div>
@@ -42,8 +41,8 @@ const AnalyticsTab = ({ analytics }) => {
                 </span>
                 <span style={{ color: 'var(--text-dim)' }}>{f.count} · {f.conversionRate}%</span>
               </div>
-              <div style={{ height: '10px', background: 'var(--glass)', borderRadius: '5px', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.max((f.count / maxCount) * 100, 2)}%`, height: '100%', background: `linear-gradient(90deg, ${stageColors[f.stage]}, ${stageColors[f.stage]}80)`, borderRadius: '5px', transition: 'width 0.6s ease' }} />
+              <div style={{ height: '10px', background: 'var(--glass)', borderRadius: '5px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                <div style={{ width: `${Math.max((f.count / maxCount) * 100, 2)}%`, height: '100%', background: `linear-gradient(90deg, ${stageColors[f.stage]}, ${stageColors[f.stage]}80)`, borderRadius: '5px', transition: 'width 0.6s ease', boxShadow: `0 0 10px ${stageColors[f.stage]}80` }} />
               </div>
             </div>
           ))}
@@ -109,8 +108,8 @@ const AnalyticsTab = ({ analytics }) => {
                   <span style={{ fontWeight: '600' }}>{label}</span>
                   <span style={{ color: 'var(--text-dim)' }}>{count}</span>
                 </div>
-                <div style={{ height: '10px', background: 'var(--glass)', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div style={{ width: `${width}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)', borderRadius: '6px' }} />
+                <div style={{ height: '10px', background: 'var(--glass)', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                  <div style={{ width: `${width}%`, height: '100%', background: 'linear-gradient(90deg, #8b5cf6, #a78bfa)', borderRadius: '6px', transition: 'width 0.6s ease', boxShadow: '0 0 10px #8b5cf680' }} />
                 </div>
               </div>
             );
@@ -129,8 +128,8 @@ const AnalyticsTab = ({ analytics }) => {
                   <span style={{ fontWeight: '600' }}>{label}</span>
                   <span style={{ color: 'var(--text-dim)' }}>{count}</span>
                 </div>
-                <div style={{ height: '10px', background: 'var(--glass)', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div style={{ width: `${width}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #34d399)', borderRadius: '6px' }} />
+                <div style={{ height: '10px', background: 'var(--glass)', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                  <div style={{ width: `${width}%`, height: '100%', background: 'linear-gradient(90deg, #10b981, #34d399)', borderRadius: '6px', transition: 'width 0.6s ease', boxShadow: '0 0 10px #10b98180' }} />
                 </div>
               </div>
             );

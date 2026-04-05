@@ -23,6 +23,8 @@ router.post('/leads/:id/successful', crmController.markSuccessful);
 // ── Contacts ──────────────────────────────────────────────
 router.get('/contacts', crmController.getContacts);
 router.post('/contacts', crmController.createContact);
+router.post('/contacts/bulk-upload', crmController.bulkUploadContacts);
+router.patch('/contacts/bulk-status', crmController.bulkUpdateContactLeadStatus);
 router.get('/contacts/:id', crmController.getContact);
 router.put('/contacts/:id', crmController.updateContact);
 router.delete('/contacts/:id', crmController.deleteContact);

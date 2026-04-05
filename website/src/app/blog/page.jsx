@@ -2,8 +2,16 @@ import Link from "next/link";
 import { ArrowRight, Calendar, Clock, User } from "lucide-react";
 
 export const metadata = {
-  title: "Blog & Resources | Language Academy",
-  description: "Expert tips, strategies, and success stories for PTE, IELTS, and English language preparation.",
+  title: "Blog & Resources — PTE & IELTS Tips from Dhaka's Best Coaches",
+  description:
+    "Expert PTE and IELTS preparation tips, strategies, and success stories from Language Academy Bangladesh. Free guides for students preparing for PTE Academic, IELTS, and Spoken English exams.",
+  alternates: { canonical: "https://languageacademy.com.bd/blog" },
+  openGraph: {
+    title: "PTE & IELTS Tips — Language Academy Blog",
+    description: "Free guides, strategies, and expert tips for PTE and IELTS preparation from Bangladesh's best coaching centre.",
+    url: "https://languageacademy.com.bd/blog",
+    images: [{ url: "/hero_banner.png", width: 1200, height: 630, alt: "Language Academy Blog" }],
+  },
 };
 
 async function getBlogs() {

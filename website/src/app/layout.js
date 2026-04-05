@@ -3,6 +3,8 @@ import { Plus_Jakarta_Sans, Outfit } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import FacebookPixel from "@/components/FacebookPixel";
+import JsonLd, { localBusinessSchema, websiteSchema, breadcrumbSchema } from "@/components/JsonLd";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -16,15 +18,99 @@ const outfit = Outfit({
   display: "swap",
 });
 
+/* ─── Global Metadata (Next.js App Router) ─────────────────── */
 export const metadata = {
-  title: "Language Academy | Premium PTE & IELTS Coaching in Dhaka",
+  metadataBase: new URL("https://languageacademy.com.bd"),
+
+  title: {
+    default: "Language Academy | Best PTE Coaching Centre in Bangladesh",
+    template: "%s | Language Academy Bangladesh",
+  },
   description:
-    "Language Academy is Bangladesh's leading English language coaching centre offering expert-led PTE Academic, IELTS preparation, and Spoken English courses with a 94% target-score success rate.",
-  keywords: "PTE coaching Dhaka, IELTS preparation Bangladesh, Spoken English course, Language Academy, English language centre",
+    "Language Academy is the best PTE coaching centre in Dhaka, Bangladesh. Expert-led PTE Academic, IELTS preparation, and Spoken English courses — online & offline. 94% target-score success rate.",
+  keywords: [
+    "best PTE coaching centre Bangladesh",
+    "PTE coaching Dhaka",
+    "PTE Academic preparation",
+    "IELTS coaching Dhaka",
+    "IELTS preparation Bangladesh",
+    "Spoken English course Dhaka",
+    "Language Academy Bangladesh",
+    "English language centre Dhaka",
+    "PTE classes online Bangladesh",
+    "best IELTS coaching Bangladesh",
+    "PTE mock test Dhaka",
+    "study abroad Bangladesh",
+    "English proficiency test preparation",
+    "Dhanmondi language school",
+    "PTE coaching near me",
+  ],
+
+  authors: [{ name: "Language Academy Bangladesh", url: "https://languageacademy.com.bd" }],
+  creator: "Language Academy Bangladesh",
+  publisher: "Language Academy Bangladesh",
+
+  formatDetection: {
+    telephone: true,
+    email: true,
+    address: true,
+  },
+
+  alternates: {
+    canonical: "https://languageacademy.com.bd",
+  },
+
   openGraph: {
-    title: "Language Academy | Premium PTE & IELTS Coaching",
-    description: "Expert-led English language coaching with 94% success rate. PTE, IELTS & Spoken English courses in Dhaka.",
     type: "website",
+    locale: "en_US",
+    url: "https://languageacademy.com.bd",
+    siteName: "Language Academy Bangladesh",
+    title: "Language Academy | Best PTE & IELTS Coaching in Dhaka, Bangladesh",
+    description:
+      "Expert-led PTE Academic, IELTS, and Spoken English courses in Dhaka. Online & offline classes with 94% target-score success rate. Book a free consultation today.",
+    images: [
+      {
+        url: "/hero_banner.png",
+        width: 1200,
+        height: 630,
+        alt: "Language Academy Bangladesh — Best PTE Coaching Centre in Dhaka",
+      },
+    ],
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "Language Academy | Best PTE Coaching Centre in Bangladesh",
+    description:
+      "Expert-led PTE, IELTS, and Spoken English courses in Dhaka. 94% success rate. Online & offline.",
+    images: ["/hero_banner.png"],
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+
+  category: "education",
+  classification: "Language School",
+
+  other: {
+    "geo.region": "BD-13",
+    "geo.placename": "Dhaka, Bangladesh",
+    "geo.position": "23.7461;90.3742",
+    "ICBM": "23.7461, 90.3742",
+    "rating": "General",
+    "revisit-after": "7 days",
+    "DC.title": "Language Academy — Best PTE Coaching Centre in Bangladesh",
+    "DC.creator": "Language Academy Bangladesh",
+    "DC.subject": "PTE Coaching, IELTS Preparation, Spoken English, Dhaka",
   },
 };
 
@@ -32,31 +118,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${jakarta.variable} ${outfit.variable}`}>
       <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "EducationalOrganization",
-              "name": "Language Academy",
-              "description": "Premium English language coaching centre in Dhaka, Bangladesh",
-              "url": "https://languageacademy.com.bd",
-              "address": {
-                "@type": "PostalAddress",
-                "streetAddress": "SEL SUFI SQUARE, Unit: 1104, Level: 11, Plot: 58, Road: 16 (New) / 27 (Old), Dhanmondi R/A",
-                "addressLocality": "Dhaka",
-                "postalCode": "1209",
-                "addressCountry": "BD"
-              },
-              "telephone": "+880-1913-373581",
-              "sameAs": [
-                "https://facebook.com/languageacademybd",
-                "https://instagram.com/languageacademyb",
-                "https://youtube.com/@languageacademybd"
-              ]
-            }),
-          }}
-        />
+        {/* ── Structured Data for AI + Search Engines ─── */}
+        <JsonLd data={localBusinessSchema()} />
+        <JsonLd data={websiteSchema()} />
+        <JsonLd data={breadcrumbSchema([
+          { name: "Home", url: "https://languageacademy.com.bd" },
+        ])} />
       </head>
       <body className={`${jakarta.className} bg-background text-foreground`}>
         <div className="page-shell flex min-h-screen flex-col">
@@ -65,6 +132,7 @@ export default function RootLayout({ children }) {
           <Footer />
         </div>
         <WhatsAppButton />
+        <FacebookPixel />
       </body>
     </html>
   );

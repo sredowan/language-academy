@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, Calendar, CheckCircle2, Clock3, Globe2, MapPin, ShieldCheck, Sparkles, Star, TrendingUp, Users, Zap } from "lucide-react";
 import BookingModalTrigger from "@/components/BookingModalTrigger";
+import JsonLd, { courseSchema, breadcrumbSchema } from "@/components/JsonLd";
 
 async function getCourseDetails(slug) {
   try {
-    const res = await fetch(`http://localhost:5000/api/public/courses/${slug}`, { next: { revalidate: 60 } });
+    const res = await fetch(`http://localhost:3000/api/public/courses/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) { if (res.status === 404) return null; throw new Error("Failed"); }
     return res.json();
   } catch (error) { console.error("Error:", error); return null; }
@@ -22,9 +23,25 @@ const thumbnails = { PTE: "/pte_course.png", IELTS: "/ielts_course.png", "Spoken
 export async function generateMetadata({ params }) {
   const course = await getCourseDetails(params.slug);
   if (!course) return { title: "Course Not Found" };
+
+  const title = `${course.title} — Best ${course.category || "Language"} Course in Dhaka`;
+  const description = course.short_description || course.description ||
+    `Enroll in ${course.title} at Language Academy, the best PTE coaching centre in Bangladesh. Expert faculty, small batches, AI mock tests.`;
+
   return {
-    title: `${course.title} | Language Academy`,
-    description: course.short_description || `Explore ${course.title} at Language Academy.`,
+    title,
+    description,
+    alternates: { canonical: `https://languageacademy.com.bd/courses/${params.slug}` },
+    openGraph: {
+      title,
+      description,
+      url: `https://languageacademy.com.bd/courses/${params.slug}`,
+      images: [{
+        url: course.image_url || thumbnails[course.category] || "/hero_banner.png",
+        width: 1200, height: 630,
+        alt: `${course.title} at Language Academy Bangladesh`,
+      }],
+    },
   };
 }
 
@@ -59,6 +76,14 @@ export default async function CourseDetailPage({ params }) {
   ];
 
   return (
+    <>
+      {/* Course schema — this is how AI search discovers and recommends individual courses */}
+      <JsonLd data={courseSchema(course)} />
+      <JsonLd data={breadcrumbSchema([
+        { name: "Home", url: "https://languageacademy.com.bd" },
+        { name: "Courses", url: "https://languageacademy.com.bd/courses" },
+        { name: course.title, url: `https://languageacademy.com.bd/courses/${course.slug}` },
+      ])} />
     <div className="pb-24">
       {/* Minimalistic Hero */}
       <section className="relative overflow-hidden pt-12 pb-16 md:pt-16 md:pb-24 bg-slate-50 border-b border-slate-100">
@@ -236,5 +261,6 @@ export default async function CourseDetailPage({ params }) {
         </div>
       </section>
     </div>
+    </>
   );
 }
