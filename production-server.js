@@ -171,7 +171,7 @@ async function start() {
   log(`  admin-portal/dist exists: ${fs.existsSync(adminDist)}`);
   log(`  admin-portal/dist/index.html exists: ${fs.existsSync(path.join(adminDist, 'index.html'))}`);
   app.use('/admin', express.static(adminDist));
-  app.get('/admin/*', (req, res) => {
+  app.get('/admin/{*splat}', (req, res) => {
     res.sendFile(path.join(adminDist, 'index.html'));
   });
 
@@ -180,12 +180,12 @@ async function start() {
   log(`  student-portal/dist exists: ${fs.existsSync(studentDist)}`);
   log(`  student-portal/dist/index.html exists: ${fs.existsSync(path.join(studentDist, 'index.html'))}`);
   app.use('/student', express.static(studentDist));
-  app.get('/student/*', (req, res) => {
+  app.get('/student/{*splat}', (req, res) => {
     res.sendFile(path.join(studentDist, 'index.html'));
   });
 
   // Next.js catch-all
-  app.all('*', (req, res) => {
+  app.all('{*splat}', (req, res) => {
     return nextHandle(req, res);
   });
 
