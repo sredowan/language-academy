@@ -1,231 +1,306 @@
 /**
- * ╔══════════════════════════════════════════════════════════════╗
- * ║  Language Academy — Monolith Production Server              ║
- * ║                                                             ║
- * ║  Combines:                                                  ║
- * ║    • Express backend API (/api/*)                           ║
- * ║    • Static admin portal  (/admin/*)                        ║
- * ║    • Static student portal (/student/*)                     ║
- * ║    • Next.js website      (/* catch-all)                    ║
- * ║    • Upload file serving  (/uploads/*)                      ║
- * ║                                                             ║
- * ║  Single process · Single port · Hostinger-ready             ║
- * ╚══════════════════════════════════════════════════════════════╝
+ * Language Academy — Monolith Production Server
+ * Single process · Single port · Hostinger-ready
  */
 
-const express = require('express');
-const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
-const next = require('next');
+
+// ─── DEBUG LOG — writes to file + console so we can always see what happened ─
+const LOG_FILE = path.join(__dirname, 'startup-debug.log');
+function log(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}`;
+  console.log(line);
+  try { fs.appendFileSync(LOG_FILE, line + '\n'); } catch (e) { /* ignore */ }
+}
+
+// Clear previous log
+try { fs.writeFileSync(LOG_FILE, ''); } catch (e) { /* ignore */ }
+
+log('═══ PRODUCTION SERVER STARTING ═══');
+log(`__dirname: ${__dirname}`);
+log(`cwd: ${process.cwd()}`);
+log(`Node version: ${process.version}`);
+log(`Platform: ${process.platform} ${process.arch}`);
+log(`ENV PORT (before dotenv): ${process.env.PORT || '(not set)'}`);
+log(`ENV NODE_ENV: ${process.env.NODE_ENV || '(not set)'}`);
 
 // ─── Capture Hostinger's PORT before dotenv can override it ─────────────────
 const HOSTINGER_PORT = process.env.PORT;
 
-// ─── Load backend .env (for DB creds, JWT, SMTP — NOT for PORT) ─────────────
-require('dotenv').config({ path: path.join(__dirname, 'backend', '.env') });
-process.env.TZ = 'Asia/Dhaka';
-
-// Use Hostinger's assigned PORT first, then fallback
-const PORT = HOSTINGER_PORT || process.env.PORT || 3000;
-const isDev = process.env.NODE_ENV !== 'production';
-
-// ─── Global error handlers (so crashes produce visible logs) ────────────────
+// ─── Global error handlers ──────────────────────────────────────────────────
 process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION:', err);
+  log(`UNCAUGHT EXCEPTION: ${err.stack || err.message || err}`);
 });
 process.on('unhandledRejection', (err) => {
-  console.error('UNHANDLED REJECTION:', err);
+  log(`UNHANDLED REJECTION: ${err && err.stack ? err.stack : err}`);
 });
 
-// ─── Next.js app (website) ──────────────────────────────────────────────────
-const nextApp = next({
-  dev: false,          // Always run in production mode
-  dir: path.join(__dirname, 'website'),
-  conf: {
-    // Tell Next.js it's served from root /
-    skipTrailingSlashRedirect: true,
-  },
-});
-const nextHandle = nextApp.getRequestHandler();
+// ─── Step 1: Load dotenv ────────────────────────────────────────────────────
+log('STEP 1: Loading dotenv...');
+const envPath = path.join(__dirname, 'backend', '.env');
+const envExists = fs.existsSync(envPath);
+log(`  backend/.env path: ${envPath}`);
+log(`  backend/.env EXISTS: ${envExists}`);
+if (envExists) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  log(`  backend/.env has ${envContent.split('\n').length} lines`);
+  // Log key names only (not values for security)
+  const keys = envContent.split('\n').filter(l => l.includes('=')).map(l => l.split('=')[0].trim());
+  log(`  ENV keys found: ${keys.join(', ')}`);
+}
+require('dotenv').config({ path: envPath });
+process.env.TZ = 'Asia/Dhaka';
+
+const PORT = HOSTINGER_PORT || process.env.PORT || 3000;
+log(`  Final PORT: ${PORT}`);
+log(`  DB_HOST: ${process.env.DB_HOST || '(NOT SET!)'}`);
+log(`  DB_NAME: ${process.env.DB_NAME || '(NOT SET!)'}`);
+log('STEP 1: Done');
+
+// ─── Step 2: Load express ───────────────────────────────────────────────────
+log('STEP 2: Loading express...');
+let express;
+try {
+  express = require('express');
+  log(`  Express version: ${require('express/package.json').version}`);
+} catch (err) {
+  log(`  FATAL: Cannot load express: ${err.message}`);
+  process.exit(1);
+}
+log('STEP 2: Done');
+
+// ─── Step 3: Load Next.js ───────────────────────────────────────────────────
+log('STEP 3: Loading Next.js...');
+let next, nextApp, nextHandle;
+const websiteDir = path.join(__dirname, 'website');
+const nextDir = path.join(websiteDir, '.next');
+log(`  website dir: ${websiteDir}`);
+log(`  website dir exists: ${fs.existsSync(websiteDir)}`);
+log(`  .next dir exists: ${fs.existsSync(nextDir)}`);
+log(`  .next/BUILD_ID exists: ${fs.existsSync(path.join(nextDir, 'BUILD_ID'))}`);
+try {
+  next = require('next');
+  nextApp = next({
+    dev: false,
+    dir: websiteDir,
+    conf: { skipTrailingSlashRedirect: true },
+  });
+  nextHandle = nextApp.getRequestHandler();
+  log('  Next.js app created successfully');
+} catch (err) {
+  log(`  FATAL: Cannot load/create Next.js: ${err.stack || err.message}`);
+  process.exit(1);
+}
+log('STEP 3: Done');
 
 // ─── Boot ───────────────────────────────────────────────────────────────────
 async function start() {
-  // 1. Prepare Next.js
-  await nextApp.prepare();
+  // Step 4: Prepare Next.js
+  log('STEP 4: Preparing Next.js (this can take 10-30s)...');
+  try {
+    await nextApp.prepare();
+    log('STEP 4: Done — Next.js ready');
+  } catch (err) {
+    log(`STEP 4 FAILED: Next.js prepare error: ${err.stack || err.message}`);
+    process.exit(1);
+  }
 
+  // Step 5: Create Express app and mount routes
+  log('STEP 5: Creating Express app and mounting routes...');
   const app = express();
-
-  // ─── Global Middleware ──────────────────────────────────────────────────
+  const cors = require('cors');
   app.use(cors());
   app.use(express.json());
 
-  // ─── Backend API Routes ─────────────────────────────────────────────────
-  // Mount all backend routes exactly as backend/server.js does
-  app.use('/api/auth', require('./backend/routes/auth.routes'));
-  app.use('/api/crm', require('./backend/routes/crm.routes'));
-  app.use('/api/lms', require('./backend/routes/lms.routes'));
-  app.use('/api/branches', require('./backend/routes/branch.routes'));
-  app.use('/api/accounting', require('./backend/routes/accounting.routes'));
-  app.use('/api/reconciliation', require('./backend/routes/reconciliation.routes'));
-  app.use('/api/pte', require('./backend/routes/pte.routes'));
-  app.use('/api/students', require('./backend/routes/student.routes'));
-  app.use('/api/attendance', require('./backend/routes/attendance.routes'));
-  app.use('/api/enrollments', require('./backend/routes/enrollment.routes'));
-  app.use('/api/pos', require('./backend/routes/pos.routes'));
-  app.use('/api/finance', require('./backend/routes/finance.routes'));
-  app.use('/api/erp', require('./backend/routes/erp.routes'));
-  app.use('/api/schedule', require('./backend/routes/schedule.routes'));
-  app.use('/api/notifications', require('./backend/routes/notification.routes'));
-  app.use('/api/dashboard', require('./backend/routes/dashboard.routes'));
-  app.use('/api/payroll', require('./backend/routes/payroll.routes'));
-  app.use('/api/materials', require('./backend/routes/material.routes'));
-  app.use('/api/assets', require('./backend/routes/asset.routes'));
-  app.use('/api/reports', require('./backend/routes/report.routes'));
-  app.use('/api/automation', require('./backend/routes/automation.routes'));
-  app.use('/api/invoices', require('./backend/routes/invoice.routes'));
-  app.use('/api/expenses', require('./backend/routes/expense.routes'));
-  app.use('/api/budget', require('./backend/routes/budget.routes'));
-  app.use('/api/public', require('./backend/routes/public.routes'));
-  app.use('/api/payment', require('./backend/routes/payment.routes'));
-  app.use('/api/website', require('./backend/routes/website.routes'));
-  app.use('/api/hrm', require('./backend/routes/hrm.routes'));
-  app.use('/api/rbac', require('./backend/routes/rbac.routes'));
-  app.use('/api/settings', require('./backend/routes/settings.routes'));
+  // Health check endpoint (test before everything else)
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), port: PORT });
+  });
 
-  // ─── Upload Files (backend-served) ──────────────────────────────────────
+  // Mount API routes one by one with try/catch
+  const routes = [
+    ['/api/auth', './backend/routes/auth.routes'],
+    ['/api/crm', './backend/routes/crm.routes'],
+    ['/api/lms', './backend/routes/lms.routes'],
+    ['/api/branches', './backend/routes/branch.routes'],
+    ['/api/accounting', './backend/routes/accounting.routes'],
+    ['/api/reconciliation', './backend/routes/reconciliation.routes'],
+    ['/api/pte', './backend/routes/pte.routes'],
+    ['/api/students', './backend/routes/student.routes'],
+    ['/api/attendance', './backend/routes/attendance.routes'],
+    ['/api/enrollments', './backend/routes/enrollment.routes'],
+    ['/api/pos', './backend/routes/pos.routes'],
+    ['/api/finance', './backend/routes/finance.routes'],
+    ['/api/erp', './backend/routes/erp.routes'],
+    ['/api/schedule', './backend/routes/schedule.routes'],
+    ['/api/notifications', './backend/routes/notification.routes'],
+    ['/api/dashboard', './backend/routes/dashboard.routes'],
+    ['/api/payroll', './backend/routes/payroll.routes'],
+    ['/api/materials', './backend/routes/material.routes'],
+    ['/api/assets', './backend/routes/asset.routes'],
+    ['/api/reports', './backend/routes/report.routes'],
+    ['/api/automation', './backend/routes/automation.routes'],
+    ['/api/invoices', './backend/routes/invoice.routes'],
+    ['/api/expenses', './backend/routes/expense.routes'],
+    ['/api/budget', './backend/routes/budget.routes'],
+    ['/api/public', './backend/routes/public.routes'],
+    ['/api/payment', './backend/routes/payment.routes'],
+    ['/api/website', './backend/routes/website.routes'],
+    ['/api/hrm', './backend/routes/hrm.routes'],
+    ['/api/rbac', './backend/routes/rbac.routes'],
+    ['/api/settings', './backend/routes/settings.routes'],
+  ];
+
+  let routesFailed = 0;
+  for (const [mountPath, routeFile] of routes) {
+    try {
+      app.use(mountPath, require(routeFile));
+    } catch (err) {
+      routesFailed++;
+      log(`  ✘ Route ${mountPath} FAILED: ${err.message}`);
+    }
+  }
+  log(`  Mounted ${routes.length - routesFailed}/${routes.length} API routes (${routesFailed} failed)`);
+
+  // Static files
   app.use('/uploads', express.static(path.join(__dirname, 'backend', 'uploads')));
 
-  // ─── Admin Portal (pre-built Vite SPA) ──────────────────────────────────
+  // Admin Portal
   const adminDist = path.join(__dirname, 'admin-portal', 'dist');
+  log(`  admin-portal/dist exists: ${fs.existsSync(adminDist)}`);
+  log(`  admin-portal/dist/index.html exists: ${fs.existsSync(path.join(adminDist, 'index.html'))}`);
   app.use('/admin', express.static(adminDist));
-  // SPA fallback: any /admin/* route serves index.html
   app.get('/admin/*', (req, res) => {
     res.sendFile(path.join(adminDist, 'index.html'));
   });
 
-  // ─── Student Portal (pre-built Vite SPA) ────────────────────────────────
+  // Student Portal
   const studentDist = path.join(__dirname, 'student-portal', 'dist');
+  log(`  student-portal/dist exists: ${fs.existsSync(studentDist)}`);
+  log(`  student-portal/dist/index.html exists: ${fs.existsSync(path.join(studentDist, 'index.html'))}`);
   app.use('/student', express.static(studentDist));
-  // SPA fallback: any /student/* route serves index.html
   app.get('/student/*', (req, res) => {
     res.sendFile(path.join(studentDist, 'index.html'));
   });
 
-  // ─── Next.js Website (catch-all) ────────────────────────────────────────
+  // Next.js catch-all
   app.all('*', (req, res) => {
     return nextHandle(req, res);
   });
 
-  // ─── Database Init (mirrors backend/server.js) ──────────────────────────
-  const sequelize = require('./backend/config/db.config');
+  log('STEP 5: Done — all routes mounted');
 
-  // Models & Associations  
-  const ExpenseCategory = require('./backend/models/ExpenseCategory');
-  const Expense = require('./backend/models/Expense');
-  const Contact = require('./backend/models/Contact');
-  const Opportunity = require('./backend/models/Opportunity');
-  const Activity = require('./backend/models/Activity');
-  const CampaignTemplate = require('./backend/models/CampaignTemplate');
-  const Lead = require('./backend/models/Lead');
-  const Student = require('./backend/models/Student');
-  const PteTask = require('./backend/models/PteTask');
-  const Course = require('./backend/models/Course');
-  const Batch = require('./backend/models/Batch');
-  const ReconciliationSession = require('./backend/models/ReconciliationSession');
-  const ReconciliationLine = require('./backend/models/ReconciliationLine');
-  const ReconciliationMatch = require('./backend/models/ReconciliationMatch');
-  const ReconciliationEvent = require('./backend/models/ReconciliationEvent');
-  const LiquidityMovement = require('./backend/models/LiquidityMovement');
-  const Transaction = require('./backend/models/Transaction');
-  const JournalEntry = require('./backend/models/JournalEntry');
-  const JournalLine = require('./backend/models/JournalLine');
-  const Account = require('./backend/models/Account');
-  const BankAccount = require('./backend/models/BankAccount');
-  const BankAccountLedgerMap = require('./backend/models/BankAccountLedgerMap');
-  const Invoice = require('./backend/models/Invoice');
-  const Enrollment = require('./backend/models/Enrollment');
-  const User = require('./backend/models/User');
-  const StaffAttendance = require('./backend/models/StaffAttendance');
-  const LeaveType = require('./backend/models/LeaveType');
-  const LeaveRequest = require('./backend/models/LeaveRequest');
-  const LeaveBalance = require('./backend/models/LeaveBalance');
-  const JobPosting = require('./backend/models/JobPosting');
-  const Applicant = require('./backend/models/Applicant');
-  const StaffDocument = require('./backend/models/StaffDocument');
-  const PerformanceReview = require('./backend/models/PerformanceReview');
-  const Shift = require('./backend/models/Shift');
-  const StaffSchedule = require('./backend/models/StaffSchedule');
-  const StaffProfile = require('./backend/models/StaffProfile');
-  const RbacConfig = require('./backend/models/RbacConfig');
-  const SystemSetting = require('./backend/models/SystemSetting');
-  const IncomeCategory = require('./backend/models/IncomeCategory');
-  const Customer = require('./backend/models/Customer');
-
-  // Associations
-  Course.hasMany(Batch, { foreignKey: 'course_id' });
-  ReconciliationSession.hasMany(ReconciliationLine, { foreignKey: 'session_id' });
-  ReconciliationSession.hasMany(ReconciliationEvent, { foreignKey: 'session_id' });
-  ReconciliationLine.belongsTo(ReconciliationSession, { foreignKey: 'session_id' });
-  ReconciliationLine.belongsTo(BankAccount, { foreignKey: 'bank_account_id' });
-  ReconciliationLine.belongsTo(Account, { foreignKey: 'account_id' });
-  ReconciliationEvent.belongsTo(ReconciliationSession, { foreignKey: 'session_id' });
-  Student.belongsTo(User, { foreignKey: 'user_id' });
-  User.hasOne(Student, { foreignKey: 'user_id' });
-  Enrollment.belongsTo(Student, { foreignKey: 'student_id' });
-  Enrollment.belongsTo(Batch, { foreignKey: 'batch_id' });
-  Transaction.belongsTo(Enrollment, { foreignKey: 'enrollment_id' });
-  Invoice.belongsTo(Student, { foreignKey: 'student_id' });
-  Invoice.belongsTo(Enrollment, { foreignKey: 'enrollment_id' });
-  JournalEntry.hasMany(JournalLine, { foreignKey: 'journal_entry_id' });
-  JournalLine.belongsTo(JournalEntry, { foreignKey: 'journal_entry_id' });
-  JournalLine.belongsTo(Account, { foreignKey: 'account_id' });
-
-  const models = [
-    User, ExpenseCategory, Expense, Lead, Contact, Opportunity, Activity,
-    CampaignTemplate, Student, PteTask, Course, Batch, Account, BankAccount,
-    BankAccountLedgerMap, Invoice, Enrollment, Transaction, JournalEntry,
-    JournalLine, ReconciliationSession, ReconciliationLine,
-    ReconciliationMatch, ReconciliationEvent, LiquidityMovement,
-    StaffAttendance, LeaveType, LeaveRequest, LeaveBalance,
-    JobPosting, Applicant, StaffDocument, PerformanceReview,
-    Shift, StaffSchedule, StaffProfile, RbacConfig, SystemSetting,
-    IncomeCategory, Customer,
-  ];
-
+  // Step 6: Database
+  log('STEP 6: Connecting to database...');
   try {
-    await sequelize.authenticate();
-    console.log('✓ Database connected');
+    const sequelize = require('./backend/config/db.config');
 
+    const ExpenseCategory = require('./backend/models/ExpenseCategory');
+    const Expense = require('./backend/models/Expense');
+    const Contact = require('./backend/models/Contact');
+    const Opportunity = require('./backend/models/Opportunity');
+    const Activity = require('./backend/models/Activity');
+    const CampaignTemplate = require('./backend/models/CampaignTemplate');
+    const Lead = require('./backend/models/Lead');
+    const Student = require('./backend/models/Student');
+    const PteTask = require('./backend/models/PteTask');
+    const Course = require('./backend/models/Course');
+    const Batch = require('./backend/models/Batch');
+    const ReconciliationSession = require('./backend/models/ReconciliationSession');
+    const ReconciliationLine = require('./backend/models/ReconciliationLine');
+    const ReconciliationMatch = require('./backend/models/ReconciliationMatch');
+    const ReconciliationEvent = require('./backend/models/ReconciliationEvent');
+    const LiquidityMovement = require('./backend/models/LiquidityMovement');
+    const Transaction = require('./backend/models/Transaction');
+    const JournalEntry = require('./backend/models/JournalEntry');
+    const JournalLine = require('./backend/models/JournalLine');
+    const Account = require('./backend/models/Account');
+    const BankAccount = require('./backend/models/BankAccount');
+    const BankAccountLedgerMap = require('./backend/models/BankAccountLedgerMap');
+    const Invoice = require('./backend/models/Invoice');
+    const Enrollment = require('./backend/models/Enrollment');
+    const User = require('./backend/models/User');
+    const StaffAttendance = require('./backend/models/StaffAttendance');
+    const LeaveType = require('./backend/models/LeaveType');
+    const LeaveRequest = require('./backend/models/LeaveRequest');
+    const LeaveBalance = require('./backend/models/LeaveBalance');
+    const JobPosting = require('./backend/models/JobPosting');
+    const Applicant = require('./backend/models/Applicant');
+    const StaffDocument = require('./backend/models/StaffDocument');
+    const PerformanceReview = require('./backend/models/PerformanceReview');
+    const Shift = require('./backend/models/Shift');
+    const StaffSchedule = require('./backend/models/StaffSchedule');
+    const StaffProfile = require('./backend/models/StaffProfile');
+    const RbacConfig = require('./backend/models/RbacConfig');
+    const SystemSetting = require('./backend/models/SystemSetting');
+    const IncomeCategory = require('./backend/models/IncomeCategory');
+    const Customer = require('./backend/models/Customer');
+
+    log('  Models loaded, setting up associations...');
+
+    Course.hasMany(Batch, { foreignKey: 'course_id' });
+    ReconciliationSession.hasMany(ReconciliationLine, { foreignKey: 'session_id' });
+    ReconciliationSession.hasMany(ReconciliationEvent, { foreignKey: 'session_id' });
+    ReconciliationLine.belongsTo(ReconciliationSession, { foreignKey: 'session_id' });
+    ReconciliationLine.belongsTo(BankAccount, { foreignKey: 'bank_account_id' });
+    ReconciliationLine.belongsTo(Account, { foreignKey: 'account_id' });
+    ReconciliationEvent.belongsTo(ReconciliationSession, { foreignKey: 'session_id' });
+    Student.belongsTo(User, { foreignKey: 'user_id' });
+    User.hasOne(Student, { foreignKey: 'user_id' });
+    Enrollment.belongsTo(Student, { foreignKey: 'student_id' });
+    Enrollment.belongsTo(Batch, { foreignKey: 'batch_id' });
+    Transaction.belongsTo(Enrollment, { foreignKey: 'enrollment_id' });
+    Invoice.belongsTo(Student, { foreignKey: 'student_id' });
+    Invoice.belongsTo(Enrollment, { foreignKey: 'enrollment_id' });
+    JournalEntry.hasMany(JournalLine, { foreignKey: 'journal_entry_id' });
+    JournalLine.belongsTo(JournalEntry, { foreignKey: 'journal_entry_id' });
+    JournalLine.belongsTo(Account, { foreignKey: 'account_id' });
+
+    log('  Associations set, authenticating DB...');
+    await sequelize.authenticate();
+    log('  ✓ Database authenticated');
+
+    const models = [
+      User, ExpenseCategory, Expense, Lead, Contact, Opportunity, Activity,
+      CampaignTemplate, Student, PteTask, Course, Batch, Account, BankAccount,
+      BankAccountLedgerMap, Invoice, Enrollment, Transaction, JournalEntry,
+      JournalLine, ReconciliationSession, ReconciliationLine,
+      ReconciliationMatch, ReconciliationEvent, LiquidityMovement,
+      StaffAttendance, LeaveType, LeaveRequest, LeaveBalance,
+      JobPosting, Applicant, StaffDocument, PerformanceReview,
+      Shift, StaffSchedule, StaffProfile, RbacConfig, SystemSetting,
+      IncomeCategory, Customer,
+    ];
+
+    log('  Syncing models...');
     await Promise.allSettled(
       models.map(m => m.sync({ alter: true }).catch(err => {
-        console.warn(`  ⚠ Sync warning for ${m.name}: ${err.message.substring(0, 80)}`);
+        log(`  ⚠ Sync warning ${m.name}: ${err.message.substring(0, 100)}`);
       }))
     );
+    log('  ✓ Models synced');
 
-    // Initialize settings defaults
     const settingsController = require('./backend/controllers/settings.controller');
     await settingsController.initializeDefaults().catch(err =>
-      console.error('Error initializing settings:', err)
+      log(`  ⚠ Settings init error: ${err.message}`)
     );
+    log('STEP 6: Done — database ready');
+
   } catch (err) {
-    console.error('Database connection error:', err);
-    process.exit(1);
+    log(`STEP 6 FAILED: Database error: ${err.stack || err.message}`);
+    log('  ⚠ Continuing without database (server will still start)...');
   }
 
-  // ─── Start Server ────────────────────────────────────────────────────────
-  app.listen(PORT, () => {
-    console.log(`\n  ╔══════════════════════════════════════════════╗`);
-    console.log(`  ║  Language Academy · Production · :${PORT}        ║`);
-    console.log(`  ╠══════════════════════════════════════════════╣`);
-    console.log(`  ║  Website    → http://localhost:${PORT}           ║`);
-    console.log(`  ║  Admin      → http://localhost:${PORT}/admin     ║`);
-    console.log(`  ║  Student    → http://localhost:${PORT}/student   ║`);
-    console.log(`  ║  API        → http://localhost:${PORT}/api       ║`);
-    console.log(`  ╚══════════════════════════════════════════════╝\n`);
+  // Step 7: Listen
+  log(`STEP 7: Starting HTTP server on port ${PORT}...`);
+  app.listen(PORT, '0.0.0.0', () => {
+    log(`STEP 7: Done — Server LISTENING on 0.0.0.0:${PORT}`);
+    log('═══ PRODUCTION SERVER READY ═══');
   });
 }
 
 start().catch(err => {
-  console.error('Fatal startup error:', err);
+  log(`FATAL STARTUP ERROR: ${err.stack || err.message}`);
   process.exit(1);
 });
