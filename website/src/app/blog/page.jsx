@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Calendar, Clock, User } from "lucide-react";
+import { getApiBase } from "@/lib/api";
 
 export const metadata = {
   title: "Blog & Resources — PTE & IELTS Tips from Dhaka's Best Coaches",
@@ -16,7 +17,7 @@ export const metadata = {
 
 async function getBlogs() {
   try {
-    const res = await fetch("http://localhost:3000/api/public/blog", { next: { revalidate: 60 } });
+    const res = await fetch(`${getApiBase()}/api/public/blog`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     return res.json();
   } catch (error) {

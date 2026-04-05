@@ -3,10 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar, User, ArrowLeft, Clock, Share2, Facebook, Twitter, Linkedin } from "lucide-react";
 import JsonLd, { breadcrumbSchema } from "@/components/JsonLd";
+import { getApiBase } from "@/lib/api";
 
 async function getBlogDetails(slug) {
   try {
-    const res = await fetch(`http://localhost:3000/api/public/blog/${slug}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${getApiBase()}/api/public/blog/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) { if (res.status === 404) return null; throw new Error("Failed"); }
     return res.json();
   } catch (error) { console.error("Error:", error); return null; }
@@ -14,7 +15,7 @@ async function getBlogDetails(slug) {
 
 async function getRelatedBlogs() {
   try {
-    const res = await fetch("http://localhost:3000/api/public/blog", { next: { revalidate: 60 } });
+    const res = await fetch(`${getApiBase()}/api/public/blog`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();
     return data.slice(0, 3);

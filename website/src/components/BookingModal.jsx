@@ -32,7 +32,7 @@ export default function BookingModal({ isOpen, onClose, defaultInterest = "" }) 
         ? { name: formData.name, email: formData.email, phone: formData.phone, message: formData.message, course_id: formData.course_interest, destination_country: formData.destination_country }
         : { name: formData.name, email: formData.email, phone: formData.phone, message: formData.message, subject: "General Booking/Consultation", destination_country: formData.destination_country };
 
-      const res = await fetch(`http://localhost:3000${endpoint}`, {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

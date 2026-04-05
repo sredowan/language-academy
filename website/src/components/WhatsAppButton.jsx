@@ -20,7 +20,7 @@ export default function WhatsAppButton() {
     const fbHeaders = getFbHeaders();
 
     try {
-      const url = "http://localhost:5000/api/public/contact"; // Directly hitting backend
+      const url = "/api/public/contact";
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...fbHeaders },

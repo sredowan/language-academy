@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Calendar, CheckCircle2, Clock3, Globe2, MapPin, ShieldCheck, Sparkles, Star, TrendingUp, Users, Zap } from "lucide-react";
 import BookingModalTrigger from "@/components/BookingModalTrigger";
 import JsonLd, { courseSchema, breadcrumbSchema } from "@/components/JsonLd";
+import { getApiBase } from "@/lib/api";
 
 async function getCourseDetails(slug) {
   try {
-    const res = await fetch(`http://localhost:3000/api/public/courses/${slug}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${getApiBase()}/api/public/courses/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) { if (res.status === 404) return null; throw new Error("Failed"); }
     return res.json();
   } catch (error) { console.error("Error:", error); return null; }

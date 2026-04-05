@@ -3,11 +3,8 @@ node_modules/
 .npm
 .eslintcache
 
-# Build
-dist/
+# Build (only ignore at root level, allow sub-project dist/ and .next/)
 build/
-.next/
-out/
 .cache/
 
 # Environment
@@ -52,8 +49,6 @@ backend/uploads/
 
 # Sub-repo specific
 **/node_modules/
-**/dist/
-**/build/
 **/env
 
 .agent/

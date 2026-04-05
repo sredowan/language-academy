@@ -64,7 +64,7 @@ function SuccessContent() {
       const fbHeaders = getFbHeaders();
 
       try {
-        const res = await fetch("http://localhost:3000/api/payment/success", {
+        const res = await fetch("/api/payment/success", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...fbHeaders },
           body: JSON.stringify({ payment_ref: paymentRef }),
@@ -345,7 +345,7 @@ function SuccessContent() {
         {/* ── Action Buttons ──────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-4">
           <a
-            href="http://localhost:5174/student"
+            href="/student"
             className="accent-btn py-4 px-8 text-base shadow-xl shadow-accent/20"
           >
             <GraduationCap size={20} /> Go to Student Portal

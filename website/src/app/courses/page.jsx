@@ -1,5 +1,6 @@
 import CoursesPageClient from "./CoursesPageClient";
 import JsonLd, { courseListSchema, breadcrumbSchema } from "@/components/JsonLd";
+import { getApiBase } from "@/lib/api";
 
 export const metadata = {
   title: "Courses — PTE, IELTS & Spoken English Programs in Dhaka",
@@ -16,7 +17,7 @@ export const metadata = {
 
 async function getCourses() {
   try {
-    const res = await fetch("http://localhost:3000/api/public/courses", { next: { revalidate: 60 } });
+    const res = await fetch(`${getApiBase()}/api/public/courses`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     return res.json();
   } catch (error) {

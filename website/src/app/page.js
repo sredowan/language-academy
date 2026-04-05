@@ -1,6 +1,7 @@
 import React from "react";
 import HomepageClient from "./HomepageClient";
 import JsonLd, { faqSchema, breadcrumbSchema } from "@/components/JsonLd";
+import { getApiBase } from "@/lib/api";
 
 /* ─── Homepage SEO Metadata ────────────────────────────────── */
 export const metadata = {
@@ -46,7 +47,7 @@ const homeFaqs = [
 
 async function getFeaturedCourses() {
   try {
-    const res = await fetch("http://localhost:3000/api/public/courses", { next: { revalidate: 60 } });
+    const res = await fetch(`${getApiBase()}/api/public/courses`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();
     return data.slice(0, 6);
@@ -58,7 +59,7 @@ async function getFeaturedCourses() {
 
 async function getRecentBlogs() {
   try {
-    const res = await fetch("http://localhost:3000/api/public/blog", { next: { revalidate: 60 } });
+    const res = await fetch(`${getApiBase()}/api/public/blog`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();
     return data.slice(0, 3);

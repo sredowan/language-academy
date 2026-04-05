@@ -1,0 +1,25 @@
+{
+  "name": "language-academy",
+  "version": "1.0.0",
+  "description": "Language Academy Monolith — Backend + Admin + Student + Website",
+  "main": "production-server.js",
+  "scripts": {
+    "start": "node production-server.js",
+    "build:admin": "cd admin-portal && npm install && npx vite build",
+    "build:student": "cd student-portal && npm install && npx vite build",
+    "build:website": "cd website && npm install && npx next build",
+    "build:all": "npm run build:admin && npm run build:student && npm run build:website",
+    "postinstall": "cd backend && npm install && cd ../admin-portal && npm install && cd ../student-portal && npm install && cd ../website && npm install"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "next": "14.2.35",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -28,7 +28,6 @@ function CheckoutForm() {
 
   useEffect(() => {
     fetch("/api/public/courses")
-      .then((res) => { if (!res.ok) return fetch("http://localhost:3000/api/public/courses"); return res; })
       .then((res) => res.json())
       .then((data) => { if (Array.isArray(data)) setCourses(data); else setCourses([]); })
       .catch((err) => console.error("Failed to load courses", err));
@@ -41,7 +40,6 @@ function CheckoutForm() {
     const slugToFetch = sc ? sc.slug : formData.course_id;
     if (slugToFetch) {
       fetch(`/api/public/courses/${slugToFetch}/batches`)
-        .then((res) => { if (!res.ok) return fetch(`http://localhost:3000/api/public/courses/${slugToFetch}/batches`); return res; })
         .then((res) => res.json())
         .then((data) => { if (Array.isArray(data)) setBatches(data); else setBatches([]); })
         .catch(() => setBatches([]));
@@ -58,7 +56,7 @@ function CheckoutForm() {
     const sc = courses.find((c) => c.slug === formData.course_id);
     if (sc) payloadCourseId = sc.id;
     try {
-      const res = await fetch("http://localhost:3000/api/payment/initiate", {
+      const res = await fetch("/api/payment/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, course_id: payloadCourseId }),

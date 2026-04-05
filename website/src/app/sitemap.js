@@ -1,8 +1,10 @@
+import { getApiBase } from "@/lib/api";
+
 const SITE_URL = "https://languageacademy.com.bd";
 
 async function getCourses() {
   try {
-    const res = await fetch("http://localhost:3000/api/public/courses", { next: { revalidate: 3600 } });
+    const res = await fetch(`${getApiBase()}/api/public/courses`, { next: { revalidate: 3600 } });
     if (!res.ok) return [];
     return res.json();
   } catch { return []; }
@@ -10,7 +12,7 @@ async function getCourses() {
 
 async function getBlogs() {
   try {
-    const res = await fetch("http://localhost:3000/api/public/blog", { next: { revalidate: 3600 } });
+    const res = await fetch(`${getApiBase()}/api/public/blog`, { next: { revalidate: 3600 } });
     if (!res.ok) return [];
     return res.json();
   } catch { return []; }
