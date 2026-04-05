@@ -18,12 +18,24 @@ const cors = require('cors');
 const path = require('path');
 const next = require('next');
 
-// ─── Load backend .env ──────────────────────────────────────────────────────
+// ─── Capture Hostinger's PORT before dotenv can override it ─────────────────
+const HOSTINGER_PORT = process.env.PORT;
+
+// ─── Load backend .env (for DB creds, JWT, SMTP — NOT for PORT) ─────────────
 require('dotenv').config({ path: path.join(__dirname, 'backend', '.env') });
 process.env.TZ = 'Asia/Dhaka';
 
-const PORT = process.env.PORT || 3000;
+// Use Hostinger's assigned PORT first, then fallback
+const PORT = HOSTINGER_PORT || process.env.PORT || 3000;
 const isDev = process.env.NODE_ENV !== 'production';
+
+// ─── Global error handlers (so crashes produce visible logs) ────────────────
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION:', err);
+});
 
 // ─── Next.js app (website) ──────────────────────────────────────────────────
 const nextApp = next({
